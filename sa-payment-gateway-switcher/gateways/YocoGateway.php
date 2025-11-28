@@ -258,5 +258,12 @@ class SAPGS_YocoGateway implements SAPGS_GatewayInterface {
             'fixed' => 0.00
         );
     }
+    
+    public function get_credential_url($test_mode = false) {
+        if ($test_mode) {
+            return 'https://www.yoco.com/za/developers/api-keys/';
+        }
+        return 'https://www.yoco.com/za/developers/api-keys/';
+    }
 }
 

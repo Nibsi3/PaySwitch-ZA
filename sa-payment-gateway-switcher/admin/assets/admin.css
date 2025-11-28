@@ -189,26 +189,10 @@
     overflow: hidden;
 }
 
-.sapgs-gateway-card::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    height: 4px;
-    background: var(--sapgs-gradient);
-    transform: scaleX(0);
-    transition: transform 0.3s ease;
-}
-
 .sapgs-gateway-card:hover {
     box-shadow: var(--sapgs-shadow-xl);
     transform: translateY(-4px);
     border-color: var(--sapgs-primary-light);
-}
-
-.sapgs-gateway-card:hover::before {
-    transform: scaleX(1);
 }
 
 .sapgs-gateway-card[data-enabled="true"] {

@@ -456,6 +456,7 @@ class SAPGS_Dashboard {
         <!-- Gateway Configuration Modal -->
         <div id="sapgs-config-modal" class="sapgs-modal" style="display: none;">
             <div class="sapgs-modal-content">
+                <button type="button" class="sapgs-modal-close" onclick="jQuery('#sapgs-config-modal').data('close-function') && jQuery('#sapgs-config-modal').data('close-function')();" style="position: absolute; top: 15px; right: 15px; background: none; border: none; font-size: 24px; cursor: pointer; color: var(--sapgs-text-light); width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; border-radius: 4px; transition: all 0.2s;">&times;</button>
                 <h2 id="sapgs-config-modal-title"><?php echo esc_html__('Configure Gateway', 'sapgs'); ?></h2>
                 <form id="sapgs-config-form">
                     <div id="sapgs-test-mode-toggle" style="margin-bottom: 20px; padding: 16px; background: var(--sapgs-bg); border-radius: 8px; border: 1px solid var(--sapgs-border);">

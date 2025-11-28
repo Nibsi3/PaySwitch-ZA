@@ -91,5 +91,12 @@ interface SAPGS_GatewayInterface {
      * @return array ['percentage' => float, 'fixed' => float]
      */
     public function get_fees();
+    
+    /**
+     * Get credential URL for test or live mode
+     * @param bool $test_mode Whether to get test or live credentials URL
+     * @return string URL to the gateway's credentials/dashboard page
+     */
+    public function get_credential_url($test_mode = false);
 }
 

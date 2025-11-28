@@ -211,16 +211,50 @@
         // Modal close - click outside to close
         $(window).on('click', function(e) {
             if ($(e.target).hasClass('sapgs-modal')) {
-                $('#sapgs-config-modal').hide();
+                closeConfigModal();
             }
         });
         
         // ESC key to close modal
         $(document).on('keydown', function(e) {
             if (e.key === 'Escape' && $('#sapgs-config-modal').is(':visible')) {
-                $('#sapgs-config-modal').hide();
+                closeConfigModal();
             }
         });
+        
+        // Function to close modal and restore original config if not saved
+        function closeConfigModal() {
+            var configSaved = $('#sapgs-config-modal').data('config-saved');
+            var gatewayId = $('#sapgs-config-gateway-id').val();
+            var originalConfig = $('#sapgs-config-modal').data('original-config');
+            
+            // If config was not successfully saved, restore original config
+            if (!configSaved && gatewayId && originalConfig) {
+                $.ajax({
+                    url: sapgsData.ajaxUrl,
+                    type: 'POST',
+                    data: {
+                        action: 'sapgs_save_gateway_config',
+                        gateway_id: gatewayId,
+                        config: JSON.stringify(originalConfig),
+                        nonce: sapgsData.nonce,
+                        skip_validation: 'true' // Skip validation when restoring
+                    },
+                    async: false // Synchronous to ensure restore happens before modal closes
+                });
+            }
+            
+            // Clear modal data
+            $('#sapgs-config-modal').removeData('config-saved');
+            $('#sapgs-config-modal').removeData('current-gateway-id');
+            $('#sapgs-config-modal').removeData('original-config');
+            $('#sapgs-config-modal').removeData('original-fields');
+            
+            $('#sapgs-config-modal').hide();
+        }
+        
+        // Store close function reference
+        $('#sapgs-config-modal').data('close-function', closeConfigModal);
         
         // Load logs
         // Load logs function
@@ -703,9 +737,11 @@
             $('#sapgs-test-mode').prop('checked', testMode);
             
             // Store original fields and config for THIS gateway only
+            // This is the LAST SAVED config - we'll restore this if user closes without successful validation
             $('#sapgs-config-modal').data('current-gateway-id', gatewayId);
             $('#sapgs-config-modal').data('original-fields', fields);
-            $('#sapgs-config-modal').data('original-config', config);
+            $('#sapgs-config-modal').data('original-config', JSON.parse(JSON.stringify(config))); // Deep copy
+            $('#sapgs-config-modal').data('config-saved', false); // Track if config was successfully saved
             
             // Render fields based on test mode
             renderFieldsForMode(gatewayId, fields, config, testMode);

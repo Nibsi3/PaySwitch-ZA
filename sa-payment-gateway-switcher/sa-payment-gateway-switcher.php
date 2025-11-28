@@ -484,6 +484,7 @@ class SA_Payment_Gateway_Switcher {
         
         $gateway_id = isset($_POST['gateway_id']) ? sanitize_text_field($_POST['gateway_id']) : null;
         $config = isset($_POST['config']) ? json_decode(stripslashes($_POST['config']), true) : array();
+        $skip_validation = isset($_POST['skip_validation']) && $_POST['skip_validation'] === 'true';
         
         if (!$gateway_id) {
             wp_send_json_error(array('message' => 'Gateway ID required'));
@@ -494,13 +495,26 @@ class SA_Payment_Gateway_Switcher {
             wp_send_json_error(array('message' => 'Gateway not found'));
         }
         
-        // Save config first
-        $result = $gateway->save_config($config);
+        // If skip_validation is true, just save without validation (used for restoring original config)
+        if ($skip_validation) {
+            $result = $gateway->save_config($config);
+            wp_send_json_success(array('message' => 'Configuration restored'));
+            return;
+        }
+        
+        // Store original config before making changes (for rollback if validation fails)
+        $original_config = $gateway->get_config();
+        
+        // Temporarily save config for validation (so test_connection can use it)
+        $gateway->save_config($config);
         
         // Validate credentials by testing connection
         $test_result = $gateway->test_connection();
         
         if (!$test_result['success']) {
+            // Restore original config since validation failed
+            $gateway->save_config($original_config);
+            
             // Extract specific error message
             $error_message = $test_result['message'] ?? 'Connection test failed';
             
@@ -512,7 +526,10 @@ class SA_Payment_Gateway_Switcher {
                 'error_type' => 'validation_failed',
                 'raw_error' => $error_message
             ));
+            return;
         }
+        
+        // Validation passed - config is already saved, no need to save again
         
         // If configuration is successful, automatically enable the gateway
         $enabled_gateways = get_option('sapgs_enabled_gateways', array());
