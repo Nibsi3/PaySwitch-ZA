@@ -27,17 +27,13 @@ class SAPGS_Logger {
         $license_manager = new SAPGS_LicenseManager();
         $is_premium = $license_manager->is_premium_active();
         
-        // Check log limit for free users
+        // Check log limit for free users (limited to 20 logs)
         if (!$is_premium) {
-            $count = $wpdb->get_var($wpdb->prepare(
-                "SELECT COUNT(*) FROM {$this->table_name}"
-            ));
+            $count = $wpdb->get_var("SELECT COUNT(*) FROM {$this->table_name}");
             
             if ($count >= 20) {
-                // Remove oldest log
-                $wpdb->query($wpdb->prepare(
-                    "DELETE FROM {$this->table_name} ORDER BY created_at ASC LIMIT 1"
-                ));
+                // Remove oldest log to maintain limit
+                $wpdb->query("DELETE FROM {$this->table_name} ORDER BY created_at ASC LIMIT 1");
             }
         }
         
@@ -66,6 +62,14 @@ class SAPGS_Logger {
      */
     public function get_logs($gateway_id = null, $limit = 50, $offset = 0) {
         global $wpdb;
+        
+        $license_manager = new SAPGS_LicenseManager();
+        $is_premium = $license_manager->is_premium_active();
+        
+        // Limit free users to 20 logs max
+        if (!$is_premium) {
+            $limit = min($limit, 20);
+        }
         
         $where = '';
         if ($gateway_id) {

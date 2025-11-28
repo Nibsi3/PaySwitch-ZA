@@ -59,7 +59,13 @@ class SAPGS_YocoGateway implements SAPGS_GatewayInterface {
     
     public function is_configured() {
         $config = $this->get_config();
-        return !empty($config['secret_key']) && !empty($config['public_key']);
+        $test_mode = isset($config['test_mode']) && ($config['test_mode'] === '1' || $config['test_mode'] === true || $config['test_mode'] === 1);
+        
+        if ($test_mode) {
+            return !empty($config['test_secret_key']) && !empty($config['test_public_key']);
+        } else {
+            return !empty($config['secret_key']) && !empty($config['public_key']);
+        }
     }
     
     public function connect() {
@@ -71,13 +77,14 @@ class SAPGS_YocoGateway implements SAPGS_GatewayInterface {
         }
         
         $config = $this->get_config();
-        $sandbox = isset($config['sandbox']) && $config['sandbox'];
-        $api_url = $sandbox ? 'https://api.yoco.com/v1' : 'https://api.yoco.com/v1';
+        $test_mode = isset($config['test_mode']) && ($config['test_mode'] === '1' || $config['test_mode'] === true || $config['test_mode'] === 1);
+        $secret_key = $test_mode ? ($config['test_secret_key'] ?? '') : ($config['secret_key'] ?? '');
+        $api_url = 'https://api.yoco.com/v1';
         
         $response = wp_remote_get($api_url . '/charges', array(
             'timeout' => 10,
             'headers' => array(
-                'Authorization' => 'Bearer ' . $config['secret_key']
+                'Authorization' => 'Bearer ' . $secret_key
             )
         ));
         
@@ -105,6 +112,8 @@ class SAPGS_YocoGateway implements SAPGS_GatewayInterface {
         }
         
         $config = $this->get_config();
+        $test_mode = isset($config['test_mode']) && ($config['test_mode'] === '1' || $config['test_mode'] === true || $config['test_mode'] === 1);
+        $secret_key = $test_mode ? ($config['test_secret_key'] ?? '') : ($config['secret_key'] ?? '');
         $api_url = 'https://api.yoco.com/v1';
         
         $start_time = microtime(true);
@@ -126,7 +135,7 @@ class SAPGS_YocoGateway implements SAPGS_GatewayInterface {
             'body' => json_encode($params),
             'headers' => array(
                 'Content-Type' => 'application/json',
-                'Authorization' => 'Bearer ' . $config['secret_key']
+                'Authorization' => 'Bearer ' . $secret_key
             ),
             'timeout' => 30
         ));
@@ -191,6 +200,8 @@ class SAPGS_YocoGateway implements SAPGS_GatewayInterface {
         }
         
         $config = $this->get_config();
+        $test_mode = isset($config['test_mode']) && ($config['test_mode'] === '1' || $config['test_mode'] === true || $config['test_mode'] === 1);
+        $secret_key = $test_mode ? ($config['test_secret_key'] ?? '') : ($config['secret_key'] ?? '');
         $api_url = 'https://api.yoco.com/v1';
         
         $params = array();
@@ -202,7 +213,7 @@ class SAPGS_YocoGateway implements SAPGS_GatewayInterface {
             'body' => json_encode($params),
             'headers' => array(
                 'Content-Type' => 'application/json',
-                'Authorization' => 'Bearer ' . $config['secret_key']
+                'Authorization' => 'Bearer ' . $secret_key
             ),
             'timeout' => 30
         ));

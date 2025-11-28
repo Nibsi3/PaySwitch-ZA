@@ -158,9 +158,16 @@ class SAPGS_SandboxTester {
     }
     
     /**
+     * Test webhook endpoint (public method)
+     */
+    public function test_webhook($gateway_id) {
+        return $this->test_webhook_internal($gateway_id);
+    }
+    
+    /**
      * Test webhook endpoint
      */
-    private function test_webhook($gateway_id) {
+    private function test_webhook_internal($gateway_id) {
         // This would test if webhook endpoint is accessible
         // For now, return a basic check
         $webhook_url = add_query_arg(array(

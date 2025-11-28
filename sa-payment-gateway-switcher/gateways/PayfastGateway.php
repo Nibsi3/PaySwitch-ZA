@@ -64,7 +64,13 @@ class SAPGS_PayfastGateway implements SAPGS_GatewayInterface {
     
     public function is_configured() {
         $config = $this->get_config();
-        return !empty($config['merchant_id']) && !empty($config['merchant_key']);
+        $test_mode = isset($config['test_mode']) && $config['test_mode'];
+        
+        if ($test_mode) {
+            return !empty($config['test_merchant_id']) && !empty($config['test_merchant_key']);
+        } else {
+            return !empty($config['merchant_id']) && !empty($config['merchant_key']);
+        }
     }
     
     public function connect() {
@@ -76,14 +82,18 @@ class SAPGS_PayfastGateway implements SAPGS_GatewayInterface {
         }
         
         $config = $this->get_config();
-        $sandbox = isset($config['sandbox']) && $config['sandbox'];
-        $api_url = $sandbox ? 'https://sandbox.payfast.co.za' : 'https://www.payfast.co.za';
+        $test_mode = isset($config['test_mode']) && $config['test_mode'];
+        $api_url = $test_mode ? 'https://sandbox.payfast.co.za' : 'https://www.payfast.co.za';
+        
+        // Use test or live keys based on test mode
+        $merchant_id = $test_mode ? (isset($config['test_merchant_id']) ? $config['test_merchant_id'] : '') : (isset($config['merchant_id']) ? $config['merchant_id'] : '');
+        $merchant_key = $test_mode ? (isset($config['test_merchant_key']) ? $config['test_merchant_key'] : '') : (isset($config['merchant_key']) ? $config['merchant_key'] : '');
         
         $response = wp_remote_get($api_url . '/eng/query/validate', array(
             'timeout' => 10,
             'headers' => array(
-                'merchant-id' => $config['merchant_id'],
-                'merchant-key' => $config['merchant_key']
+                'merchant-id' => $merchant_id,
+                'merchant-key' => $merchant_key
             )
         ));
         
