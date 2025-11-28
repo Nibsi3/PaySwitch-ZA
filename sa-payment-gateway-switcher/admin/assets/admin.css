@@ -177,58 +177,6 @@
     position: relative;
 }
 
-.sapgs-drag-handle {
-    position: absolute;
-    top: 12px;
-    right: 12px;
-    width: 32px;
-    height: 32px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: grab;
-    color: var(--sapgs-text-light);
-    opacity: 0.5;
-    transition: all 0.2s ease;
-    z-index: 10;
-    background: rgba(255, 255, 255, 0.8);
-    border-radius: 6px;
-    padding: 6px;
-}
-
-.sapgs-drag-handle:hover {
-    opacity: 1;
-    color: var(--sapgs-primary);
-    background: rgba(102, 126, 234, 0.1);
-    cursor: grab;
-}
-
-.sapgs-drag-handle:active {
-    cursor: grabbing;
-}
-
-.sapgs-gateways-grid.sapgs-sortable .sapgs-gateway-card {
-    cursor: grab;
-}
-
-.sapgs-gateways-grid.sapgs-sortable .sapgs-gateway-card:active {
-    cursor: grabbing;
-}
-
-.sapgs-gateway-card.sapgs-dragging {
-    opacity: 0.8;
-    transform: rotate(2deg);
-    box-shadow: var(--sapgs-shadow-xl);
-    z-index: 1000;
-}
-
-.sapgs-gateway-placeholder {
-    border: 2px dashed var(--sapgs-primary);
-    border-radius: 16px;
-    background: rgba(102, 126, 234, 0.05);
-    min-height: 200px;
-    margin-bottom: 24px;
-}
 
 .sapgs-gateway-card {
     border: 1px solid var(--sapgs-border);
@@ -396,8 +344,8 @@
 }
 
 .sapgs-toggle input:checked + .sapgs-toggle-slider {
-    background: #8c8f94 !important;
-    box-shadow: 0 0 0 4px rgba(140, 143, 148, 0.1);
+    background: var(--sapgs-success) !important;
+    box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.2);
 }
 
 .sapgs-toggle input:checked + .sapgs-toggle-slider:before {

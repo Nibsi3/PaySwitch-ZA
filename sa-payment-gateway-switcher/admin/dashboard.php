@@ -104,14 +104,10 @@ class SAPGS_Dashboard {
                             <option value="lowest_fees" <?php selected($sort_type, 'lowest_fees'); ?>><?php echo esc_html__('Lowest Fees', 'sapgs'); ?></option>
                             <option value="fastest_response" <?php selected($sort_type, 'fastest_response'); ?>><?php echo esc_html__('Fastest Response Time', 'sapgs'); ?></option>
                             <option value="highest_uptime" <?php selected($sort_type, 'highest_uptime'); ?>><?php echo esc_html__('Highest Uptime', 'sapgs'); ?></option>
-                            <option value="manual" <?php selected($sort_type, 'manual'); ?>><?php echo esc_html__('Manual (Drag & Drop)', 'sapgs'); ?></option>
                         </select>
-                        <span class="sapgs-sort-hint" style="color: var(--sapgs-text-light); font-size: 13px; margin-left: auto;">
-                            <?php echo esc_html__('Drag gateways to reorder when using Manual sort', 'sapgs'); ?>
-                        </span>
                     </div>
                     <?php endif; ?>
-                    <div class="sapgs-gateways-grid <?php echo $license_info['is_premium'] && $sort_type === 'manual' ? 'sapgs-sortable' : ''; ?>">
+                    <div class="sapgs-gateways-grid">
                         <?php foreach ($all_gateways as $gateway_id => $gateway): 
                             $is_enabled = isset($enabled_gateways[$gateway_id]);
                             $is_default = $default_gateway && $default_gateway->get_id() === $gateway_id;
@@ -133,18 +129,6 @@ class SAPGS_Dashboard {
                             $can_enable_more = $is_premium || ($enabled_count < $max_free_gateways) || $is_enabled;
                         ?>
                         <div class="sapgs-gateway-card" data-gateway-id="<?php echo esc_attr($gateway_id); ?>" data-enabled="<?php echo $is_enabled ? 'true' : 'false'; ?>" data-original-status="<?php echo esc_attr($raw_status); ?>">
-                            <?php if ($license_info['is_premium']): ?>
-                            <div class="sapgs-drag-handle" title="<?php echo esc_attr__('Drag to reorder', 'sapgs'); ?>">
-                                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                    <circle cx="4" cy="4" r="1.5" fill="currentColor"/>
-                                    <circle cx="12" cy="4" r="1.5" fill="currentColor"/>
-                                    <circle cx="4" cy="8" r="1.5" fill="currentColor"/>
-                                    <circle cx="12" cy="8" r="1.5" fill="currentColor"/>
-                                    <circle cx="4" cy="12" r="1.5" fill="currentColor"/>
-                                    <circle cx="12" cy="12" r="1.5" fill="currentColor"/>
-                                </svg>
-                            </div>
-                            <?php endif; ?>
                             <div class="sapgs-gateway-header">
                                 <div class="sapgs-gateway-title-wrapper">
                                     <?php 

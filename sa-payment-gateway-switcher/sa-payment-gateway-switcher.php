@@ -180,13 +180,10 @@ class SA_Payment_Gateway_Switcher {
             SAPGS_VERSION . '.' . time() // Add timestamp to prevent caching
         );
         
-        // Add jQuery UI for sortable drag and drop
-        wp_enqueue_script('jquery-ui-sortable');
-        
         wp_enqueue_script(
             'sapgs-admin',
             SAPGS_PLUGIN_URL . 'admin/assets/admin.js',
-            array('jquery', 'jquery-ui-sortable', 'wp-util'),
+            array('jquery', 'wp-util'),
             SAPGS_VERSION . '.' . time(), // Add timestamp to prevent caching
             true
         );
@@ -545,7 +542,9 @@ class SA_Payment_Gateway_Switcher {
      * Get detailed error message for gateway configuration
      */
     private function get_detailed_error_message($gateway_id, $error_message, $config) {
-        $gateway_name = ucfirst(str_replace('_', ' ', $gateway_id));
+        // Get the actual gateway name, not just formatted ID
+        $gateway = $this->gateway_manager->get_gateway($gateway_id);
+        $gateway_name = $gateway ? $gateway->get_name() : ucfirst(str_replace('_', ' ', $gateway_id));
         $lower_message = strtolower($error_message);
         
         // Check for common error patterns

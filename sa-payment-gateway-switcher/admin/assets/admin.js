@@ -644,6 +644,16 @@
                 return;
             }
             
+            // Clear any previous error messages and form data
+            $('#sapgs-config-error').remove();
+            $('#sapgs-config-form')[0].reset();
+            $('#sapgs-config-fields').empty();
+            $('#sapgs-test-mode').prop('checked', false);
+            
+            // Clear any cached data
+            $('#sapgs-config-modal').removeData('original-fields');
+            $('#sapgs-config-modal').removeData('original-config');
+            
             $('#sapgs-config-gateway-id').val(gatewayId);
             var gatewayName = gatewayId.charAt(0).toUpperCase() + gatewayId.slice(1).replace(/_/g, ' ');
             $('#sapgs-config-modal-title').text('Configure Gateway: ' + gatewayName);
@@ -685,11 +695,15 @@
                 return;
             }
             
-            // Get test mode state from config
+            // Clear any previous error messages
+            $('#sapgs-config-error').remove();
+            
+            // Get test mode state from config for THIS specific gateway
             var testMode = (config && config.test_mode) ? true : false;
             $('#sapgs-test-mode').prop('checked', testMode);
             
-            // Store original fields and config for switching
+            // Store original fields and config for THIS gateway only
+            $('#sapgs-config-modal').data('current-gateway-id', gatewayId);
             $('#sapgs-config-modal').data('original-fields', fields);
             $('#sapgs-config-modal').data('original-config', config);
             
@@ -698,6 +712,10 @@
             
             // Handle test mode toggle
             $('#sapgs-test-mode').off('change').on('change', function() {
+                var currentGatewayId = $('#sapgs-config-modal').data('current-gateway-id');
+                if (currentGatewayId !== gatewayId) {
+                    return; // Don't process if gateway changed
+                }
                 var isTestMode = $(this).is(':checked');
                 var originalFields = $('#sapgs-config-modal').data('original-fields');
                 var originalConfig = $('#sapgs-config-modal').data('original-config');
@@ -805,16 +823,23 @@
         
         // Clear error message when user starts editing
         $(document).on('input change', '#sapgs-config-form input, #sapgs-config-form select, #sapgs-config-form textarea', function() {
-            $('#sapgs-config-error').hide();
+            $('#sapgs-config-error').remove();
         });
         
         $('#sapgs-config-form').on('submit', function(e) {
             e.preventDefault();
             
             // Clear any previous errors
-            $('#sapgs-config-error').hide();
+            $('#sapgs-config-error').remove();
             
             var gatewayId = $('#sapgs-config-gateway-id').val();
+            
+            // Verify we're still configuring the same gateway
+            var currentGatewayId = $('#sapgs-config-modal').data('current-gateway-id');
+            if (currentGatewayId && currentGatewayId !== gatewayId) {
+                showNotification('Gateway configuration mismatch. Please close and reopen the configuration modal.', 'error');
+                return;
+            }
             var config = {};
             var testMode = $('#sapgs-test-mode').is(':checked');
             
@@ -1065,7 +1090,7 @@
             });
         });
         
-        // Gateway Sorting (Premium Only)
+        // Gateway Sorting (Premium Only) - No drag and drop
         if (sapgsData.isPremium) {
             var sortingData = null;
             
@@ -1084,61 +1109,6 @@
                         }
                     }
                 });
-            }
-            
-            // Initialize sortable for drag and drop
-            function initSortable() {
-                var $grid = $('.sapgs-gateways-grid');
-                if ($grid.hasClass('sapgs-sortable')) {
-                    // Destroy existing sortable if any
-                    if ($grid.hasClass('ui-sortable')) {
-                        $grid.sortable('destroy');
-                    }
-                    
-                    // Prevent clicks on interactive elements from starting drag
-                    $('.sapgs-gateway-card').on('mousedown', function(e) {
-                        // Don't start drag if clicking on buttons, toggles, or inputs
-                        if ($(e.target).is('button, input, label, .sapgs-toggle, .sapgs-toggle-slider, .sapgs-toggle-label') || 
-                            $(e.target).closest('button, input, label, .sapgs-toggle').length) {
-                            return;
-                        }
-                    });
-                    
-                    $grid.sortable({
-                        items: '.sapgs-gateway-card',
-                        cursor: 'grabbing',
-                        cursorAt: { top: 20, left: 20 },
-                        opacity: 0.8,
-                        placeholder: 'sapgs-gateway-placeholder',
-                        tolerance: 'pointer',
-                        distance: 10,
-                        delay: 100,
-                        forcePlaceholderSize: true,
-                        revert: 100,
-                        scroll: true,
-                        cancel: 'button, input, .sapgs-toggle, .sapgs-toggle-slider, .sapgs-toggle-label',
-                        start: function(event, ui) {
-                            ui.placeholder.height(ui.item.height());
-                            ui.item.addClass('sapgs-dragging');
-                            // Disable pointer events on interactive elements during drag
-                            ui.item.find('button, input, label').css('pointer-events', 'none');
-                        },
-                        stop: function(event, ui) {
-                            ui.item.removeClass('sapgs-dragging');
-                            // Re-enable pointer events
-                            ui.item.find('button, input, label').css('pointer-events', '');
-                        },
-                        update: function(event, ui) {
-                            var order = [];
-                            $('.sapgs-gateway-card').each(function() {
-                                order.push($(this).data('gateway-id'));
-                            });
-                            
-                            // Save manual order
-                            saveGatewayOrder(order, 'manual');
-                        }
-                    });
-                }
             }
             
             // Sort gateways
@@ -1244,25 +1214,14 @@
             // Handle sort dropdown change
             $('#sapgs-sort-by').on('change', function() {
                 var sortType = $(this).val();
-                var $grid = $('.sapgs-gateways-grid');
-                
-                if (sortType === 'manual') {
-                    $grid.addClass('sapgs-sortable');
-                    initSortable();
-                } else {
-                    $grid.removeClass('sapgs-sortable');
-                    $grid.sortable('destroy');
-                    sortGateways(sortType);
-                }
+                sortGateways(sortType);
             });
             
             // Initialize on page load
             loadSortingData();
             var currentSortType = $('#sapgs-sort-by').val();
-            if (currentSortType === 'manual') {
-                initSortable();
-            } else {
-                // Auto-sort on load if not manual
+            if (currentSortType && currentSortType !== 'manual') {
+                // Auto-sort on load
                 setTimeout(function() {
                     sortGateways(currentSortType);
                 }, 300);
