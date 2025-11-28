@@ -95,7 +95,8 @@ The plugin automatically creates the following database tables on activation:
 
 - `wp_sapgs_logs` - Transaction logs
 - `wp_sapgs_tests` - Test results
-- `wp_sapgs_uptime` - Uptime monitoring data
+- `wp_sapgs_uptime` - Uptime monitoring data (hourly checks)
+- `wp_sapgs_fees` - Fee history tracking (daily checks)
 
 ---
 
@@ -253,15 +254,28 @@ If you close the configuration modal without successfully validating:
 - Advanced filtering options
 
 #### Optimization Engine
-- Intelligent optimization suggestions
+- Intelligent optimization suggestions based on real transaction data
 - Fee optimization recommendations
 - Performance improvement tips
+- Default gateway suggestions based on success rates
 - One-click application of suggestions
+- Analyzes patterns across all enabled gateways
 
 #### Uptime Monitoring
-- Hourly gateway availability checks
+- Hourly gateway availability checks (automatic)
 - Downtime tracking and patterns
 - Uptime percentage calculation
+- Historical uptime data storage
+- Real-time status indicators
+- Automatic monitoring of all enabled gateways
+
+#### Fee Monitoring
+- Daily fee tracking for all gateways
+- Fee history storage and comparison
+- Cost optimization recommendations
+- Automatic fee checks on activation
+- Historical fee data analysis
+- Helps identify best pricing options
 
 #### Scheduled Testing
 - Automatic daily gateway tests
@@ -537,6 +551,25 @@ All AJAX endpoints require:
 - Parameters: `suggestion` (JSON)
 - Returns: Success/error
 
+#### Fee Monitoring (Premium)
+
+**`sapgs_get_fee_history`**
+- Get fee history for gateways
+- Parameters: `gateway_id` (optional), `days` (optional)
+- Returns: Array of fee history entries
+
+**`sapgs_get_fee_comparison`**
+- Compare fees across all gateways
+- Parameters: None
+- Returns: Fee comparison data
+
+#### Uptime Monitoring (Premium)
+
+**`sapgs_get_uptime_data`**
+- Get uptime statistics for gateways
+- Parameters: `gateway_id` (optional), `days` (optional)
+- Returns: Uptime percentage and history
+
 ---
 
 ## Developer Guide
@@ -636,6 +669,15 @@ add_action('sapgs_after_gateway_charge', function($gateway_id, $result) {
 - gateway_id (varchar)
 - is_up (tinyint)
 - response_time (int)
+- checked_at (datetime)
+```
+
+**Fee History Table: `wp_sapgs_fees`**
+```sql
+- id (bigint)
+- gateway_id (varchar)
+- percentage_fee (decimal)
+- fixed_fee (decimal)
 - checked_at (datetime)
 ```
 
@@ -814,6 +856,9 @@ add_action('sapgs_after_gateway_charge', function($gateway_id, $result) {
 - Status indicators
 - Error handling with detailed messages
 - Configuration state isolation
+- Optimization Engine (Premium) - Intelligent performance suggestions
+- Uptime Monitor (Premium) - Hourly availability tracking
+- Fee Monitor (Premium) - Daily fee tracking and cost optimization
 
 **Improvements:**
 - Enabled toggle shows green when active

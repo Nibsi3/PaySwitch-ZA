@@ -75,7 +75,10 @@ sa-payment-gateway-switcher/
 │   ├── LicenseManager.php
 │   ├── Logger.php
 │   ├── Metrics.php
-│   └── SandboxTester.php
+│   ├── OptimizationEngine.php
+│   ├── SandboxTester.php
+│   ├── UptimeMonitor.php
+│   └── FeeMonitor.php
 ├── gateways/
 │   ├── PayfastGateway.php
 │   ├── OzowGateway.php
@@ -115,15 +118,29 @@ All gateways implement `SAPGS_GatewayInterface` with standard methods:
 
 **SandboxTester**: Performs comprehensive gateway testing including DNS, TLS, and webhook checks.
 
+**OptimizationEngine**: Provides intelligent optimization suggestions based on performance data, fees, and success rates. Analyzes transaction patterns and recommends optimal gateway configurations.
+
+**UptimeMonitor**: Monitors gateway API availability hourly, tracks downtime patterns, and calculates uptime percentages. Automatically checks all enabled gateways and stores historical data.
+
+**FeeMonitor**: Tracks payment gateway fees daily, stores fee history, and provides cost optimization recommendations. Helps identify the best pricing options across all gateways.
+
 ## Database Tables
 
-The plugin creates two custom tables on activation:
+The plugin creates four custom tables on activation:
 
 1. **wp_sapgs_logs**: Transaction logs
    - gateway_id, transaction_id, order_id, amount, status, response_time, etc.
 
 2. **wp_sapgs_tests**: Test results
    - gateway_id, test_type, success, response_time, health_score, etc.
+
+3. **wp_sapgs_uptime**: Uptime monitoring data
+   - gateway_id, is_up, response_time, checked_at
+   - Tracks hourly availability checks for all gateways
+
+4. **wp_sapgs_fees**: Fee history tracking
+   - gateway_id, percentage_fee, fixed_fee, checked_at
+   - Stores daily fee checks for cost optimization
 
 ## API Integration
 
@@ -159,6 +176,8 @@ The plugin includes a built-in licensing system:
 
 The plugin uses standard WordPress hooks:
 - `sapgs_daily_license_check` - Daily license validation
+- `sapgs_hourly_uptime_check` - Hourly gateway uptime monitoring
+- `sapgs_daily_fee_check` - Daily fee monitoring
 - `sapgs_webhook_{gateway_id}` - Gateway webhook handlers
 
 ## Security
