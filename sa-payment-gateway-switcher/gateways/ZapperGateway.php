@@ -247,5 +247,9 @@ class SAPGS_ZapperGateway implements SAPGS_GatewayInterface {
             'fixed' => 0.00
         );
     }
+    
+    public function get_credential_url($test_mode = false) {
+        return 'https://www.zapper.co.za/merchant';
+    }
 }
 

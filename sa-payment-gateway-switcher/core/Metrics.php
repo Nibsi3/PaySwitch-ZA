@@ -50,10 +50,20 @@ class SAPGS_Metrics {
             'seven_day_performance' => array()
         );
         
+        // Get fee monitor for latest fees
+        $fee_monitor = new SAPGS_FeeMonitor();
+        
         // Get data for each gateway
         foreach ($all_gateways as $id => $gateway) {
             $stats = $this->logger->get_stats($id, $days);
-            $fees = $gateway->get_fees();
+            
+            // Try to get latest fees from FeeMonitor, fallback to gateway's get_fees()
+            $latest_fees = $fee_monitor->get_latest_fees($id);
+            $fees = $latest_fees ? array(
+                'percentage' => $latest_fees['percentage'],
+                'fixed' => $latest_fees['fixed'],
+                'checked_at' => $latest_fees['checked_at']
+            ) : $gateway->get_fees();
             
             $data['gateways'][$id] = array(
                 'name' => $gateway->get_name(),
@@ -200,9 +210,19 @@ class SAPGS_Metrics {
         
         $sorting_data = array();
         
+        // Get fee monitor for latest fees
+        $fee_monitor = new SAPGS_FeeMonitor();
+        
         foreach ($all_gateways as $id => $gateway) {
             $stats = $this->logger->get_stats($id, 30);
-            $fees = $gateway->get_fees();
+            
+            // Try to get latest fees from FeeMonitor, fallback to gateway's get_fees()
+            $latest_fees = $fee_monitor->get_latest_fees($id);
+            $fees = $latest_fees ? array(
+                'percentage' => $latest_fees['percentage'],
+                'fixed' => $latest_fees['fixed']
+            ) : $gateway->get_fees();
+            
             $uptime_stats = $uptime_monitor->get_uptime_stats($id, 30);
             
             // Calculate fee-adjusted cost per approval

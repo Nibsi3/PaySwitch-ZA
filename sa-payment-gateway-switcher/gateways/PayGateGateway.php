@@ -169,5 +169,9 @@ class SAPGS_PayGateGateway implements SAPGS_GatewayInterface {
             'fixed' => 2.00
         );
     }
+    
+    public function get_credential_url($test_mode = false) {
+        return 'https://secure.paygate.co.za';
+    }
 }
 

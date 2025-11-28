@@ -60,7 +60,10 @@
                 },
                 success: function(response) {
                     if (response.success) {
-                        // Update status indicator to green if enabled
+                        // Update card data attribute
+                        $card.data('enabled', enabled);
+                        
+                        // Update status indicator
                         if (enabled) {
                             $card.find('.sapgs-status-indicator')
                                 .removeClass('status-offline status-not_configured status-intermittent')
@@ -73,14 +76,52 @@
                                 .addClass('status-' + originalStatus);
                         }
                         
-                        // Smooth transition before reload
+                        // Update toggle label
+                        var $toggleLabel = $card.find('.sapgs-toggle-label');
+                        $toggleLabel.text(enabled ? 'Enabled' : 'Disabled');
+                        
+                        // Show/hide "Set as Default" button
+                        var $setDefaultBtn = $card.find('.sapgs-set-default');
+                        var isDefault = $card.find('.sapgs-badge-primary').length > 0;
+                        
+                        if (enabled && !isDefault) {
+                            // Show "Set as Default" button if not already default
+                            if ($setDefaultBtn.length === 0) {
+                                var $actions = $card.find('.sapgs-gateway-actions');
+                                $actions.append('<button class="button sapgs-set-default" data-gateway-id="' + gatewayId + '">Set as Default</button>');
+                            } else {
+                                $setDefaultBtn.show();
+                            }
+                        } else {
+                            $setDefaultBtn.hide();
+                        }
+                        
+                        // Update premium badge visibility
+                        var enabledCount = response.data?.enabled_count || 0;
+                        var isPremium = response.data?.is_premium || false;
+                        var maxFree = response.data?.max_free || 2;
+                        
+                        var $premiumBadge = $card.find('.sapgs-premium-badge');
+                        if (!isPremium && !enabled && enabledCount >= maxFree) {
+                            if ($premiumBadge.length === 0) {
+                                var $actions = $card.find('.sapgs-gateway-actions');
+                                $actions.append('<span class="sapgs-premium-badge" style="font-size: 11px; color: var(--sapgs-primary); font-weight: 600;">Premium</span>');
+                            } else {
+                                $premiumBadge.show();
+                            }
+                        } else {
+                            $premiumBadge.hide();
+                        }
+                        
+                        // Restore card appearance
                         $card.css({
-                            'transform': 'scale(0.98)',
-                            'opacity': '0.8'
-                        });
-                        setTimeout(function() {
-                        location.reload();
-                        }, 200);
+                            'opacity': '1',
+                            'pointer-events': 'auto',
+                            'transform': 'scale(1)'
+                        }).removeClass('sapgs-loading');
+                        
+                        // Show success notification
+                        showNotification(enabled ? 'Gateway enabled successfully!' : 'Gateway disabled successfully!', 'success');
                     } else {
                         $card.css({
                             'opacity': '1',
@@ -131,10 +172,42 @@
                 },
                 success: function(response) {
                     if (response.success) {
+                        // Remove default badge from all cards
+                        $('.sapgs-gateway-card').each(function() {
+                            var $card = $(this);
+                            $card.find('.sapgs-badge-primary').remove();
+                            
+                            // Show "Set as Default" button if gateway is enabled
+                            var isEnabled = $card.data('enabled') === true || $card.data('enabled') === 'true';
+                            if (isEnabled && $card.data('gateway-id') !== gatewayId) {
+                                var $setDefaultBtn = $card.find('.sapgs-set-default');
+                                if ($setDefaultBtn.length === 0) {
+                                    var $actions = $card.find('.sapgs-gateway-actions');
+                                    $actions.append('<button class="button sapgs-set-default" data-gateway-id="' + $card.data('gateway-id') + '">Set as Default</button>');
+                                } else {
+                                    $setDefaultBtn.show();
+                                }
+                            }
+                        });
+                        
+                        // Add default badge to selected gateway
+                        var $selectedCard = $('.sapgs-gateway-card[data-gateway-id="' + gatewayId + '"]');
+                        var $actions = $selectedCard.find('.sapgs-gateway-actions');
+                        
+                        // Remove "Set as Default" button
+                        $selectedCard.find('.sapgs-set-default').remove();
+                        
+                        // Add default badge
+                        if ($selectedCard.find('.sapgs-badge-primary').length === 0) {
+                            $actions.prepend('<span class="sapgs-badge sapgs-badge-primary">Default</span>');
+                        }
+                        
+                        // Restore button state
+                        $button.prop('disabled', false)
+                            .text('Set as Default')
+                            .removeClass('sapgs-loading');
+                        
                         showNotification('Default gateway updated successfully!', 'success');
-                        setTimeout(function() {
-                        location.reload();
-                        }, 1000);
                     } else {
                         showNotification(response.data.message || 'Failed to set default gateway', 'error');
                         $button.prop('disabled', false).text('Set as Default').removeClass('sapgs-loading');
@@ -666,8 +739,134 @@
                     if (sapgsData.isPremium) {
                         var days = $('#sapgs-analytics-days').val() || 7;
                         loadAnalytics(days);
+                        loadFeeComparison();
                     }
                 }, 100);
+            });
+            
+            // Fee comparison functionality
+            function loadFeeComparison() {
+                var amount = parseFloat($('#sapgs-fee-test-amount').val()) || 100;
+                
+                $.ajax({
+                    url: sapgsData.ajaxUrl,
+                    type: 'POST',
+                    data: {
+                        action: 'sapgs_get_fee_comparison',
+                        nonce: sapgsData.nonce,
+                        amount: amount
+                    },
+                    success: function(response) {
+                        if (response.success) {
+                            renderFeeComparison(response.data);
+                        } else {
+                            $('#sapgs-fee-comparison-results').html(
+                                '<div style="text-align: center; padding: 40px; color: var(--sapgs-text-secondary);">' +
+                                '<p>' + (response.data.message || 'Failed to load fee comparison') + '</p>' +
+                                '</div>'
+                            );
+                        }
+                    },
+                    error: function() {
+                        $('#sapgs-fee-comparison-results').html(
+                            '<div style="text-align: center; padding: 40px; color: #dc3545;">' +
+                            '<p>Error loading fee comparison. Please try again.</p>' +
+                            '</div>'
+                        );
+                    }
+                });
+            }
+            
+            function renderFeeComparison(data) {
+                var html = '<div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px;">';
+                
+                if (data.comparison && Object.keys(data.comparison).length > 0) {
+                    $.each(data.comparison, function(gatewayId, info) {
+                        var isBest = info.is_best;
+                        var borderColor = isBest ? '#10b981' : 'var(--sapgs-border)';
+                        var bgColor = isBest ? 'rgba(16, 185, 129, 0.05)' : 'transparent';
+                        
+                        html += '<div style="background: ' + bgColor + '; border: 2px solid ' + borderColor + '; border-radius: 12px; padding: 20px; position: relative;">';
+                        
+                        if (isBest) {
+                            html += '<div style="position: absolute; top: -10px; right: 16px; background: #10b981; color: white; padding: 4px 12px; border-radius: 12px; font-size: 11px; font-weight: 600; text-transform: uppercase;">Best Value</div>';
+                        }
+                        
+                        html += '<h4 style="margin: 0 0 12px 0; color: var(--sapgs-text); font-size: 18px;">' + info.name + '</h4>';
+                        html += '<div style="margin-bottom: 12px;">';
+                        html += '<div style="font-size: 14px; color: var(--sapgs-text-secondary); margin-bottom: 4px;">Fee Structure:</div>';
+                        html += '<div style="font-size: 16px; font-weight: 600; color: var(--sapgs-text);">' + info.percentage + '% + R' + info.fixed.toFixed(2) + '</div>';
+                        html += '</div>';
+                        html += '<div style="margin-bottom: 12px;">';
+                        html += '<div style="font-size: 14px; color: var(--sapgs-text-secondary); margin-bottom: 4px;">Cost for R' + data.test_amount.toFixed(2) + ':</div>';
+                        html += '<div style="font-size: 24px; font-weight: 700; color: ' + (isBest ? '#10b981' : 'var(--sapgs-text)') + ';">R' + info.cost.toFixed(2) + '</div>';
+                        html += '</div>';
+                        
+                        if (info.checked_at) {
+                            var checkedDate = new Date(info.checked_at);
+                            html += '<div style="font-size: 12px; color: var(--sapgs-text-secondary); margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--sapgs-border);">';
+                            html += 'Last checked: ' + checkedDate.toLocaleDateString();
+                            html += '</div>';
+                        }
+                        
+                        html += '</div>';
+                    });
+                } else {
+                    html += '<div style="grid-column: 1 / -1; text-align: center; padding: 40px; color: var(--sapgs-text-secondary);">';
+                    html += '<p>No fee data available. Click "Check Fees Now" to fetch current fees.</p>';
+                    html += '</div>';
+                }
+                
+                html += '</div>';
+                
+                if (data.best_gateway) {
+                    html += '<div style="margin-top: 24px; padding: 16px; background: rgba(16, 185, 129, 0.1); border-left: 4px solid #10b981; border-radius: 8px;">';
+                    html += '<strong style="color: #10b981;">Best Option:</strong> ';
+                    html += '<span style="color: var(--sapgs-text);">' + data.best_gateway.gateway_id + ' with a cost of R' + data.best_gateway.cost.toFixed(2) + ' for a R' + data.test_amount.toFixed(2) + ' transaction</span>';
+                    html += '</div>';
+                }
+                
+                $('#sapgs-fee-comparison-results').html(html);
+            }
+            
+            // Load fee comparison on page load if on analytics tab
+            if ($('#analytics').hasClass('active')) {
+                loadFeeComparison();
+            }
+            
+            // Check fees now button
+            $('#sapgs-check-fees-now').on('click', function() {
+                var $btn = $(this);
+                var originalText = $btn.text();
+                $btn.prop('disabled', true).text('Checking...');
+                
+                $.ajax({
+                    url: sapgsData.ajaxUrl,
+                    type: 'POST',
+                    data: {
+                        action: 'sapgs_check_fees_now',
+                        nonce: sapgsData.nonce
+                    },
+                    success: function(response) {
+                        if (response.success) {
+                            showNotification('Fees checked successfully!', 'success');
+                            loadFeeComparison();
+                        } else {
+                            showNotification(response.data.message || 'Failed to check fees', 'error');
+                        }
+                    },
+                    error: function() {
+                        showNotification('Error checking fees. Please try again.', 'error');
+                    },
+                    complete: function() {
+                        $btn.prop('disabled', false).text(originalText);
+                    }
+                });
+            });
+            
+            // Update fee comparison when amount changes
+            $('#sapgs-fee-test-amount').on('change', function() {
+                loadFeeComparison();
             });
         }
         
@@ -928,12 +1127,57 @@
                         var message = response.data?.message || 'Configuration saved and validated successfully!';
                         if (response.data?.gateway_enabled) {
                             message += ' The gateway has been automatically enabled.';
+                            
+                            // Update the gateway card to reflect enabled state
+                            var $card = $('.sapgs-gateway-card[data-gateway-id="' + gatewayId + '"]');
+                            if ($card.length) {
+                                // Update enabled state
+                                $card.data('enabled', true);
+                                
+                                // Enable the toggle
+                                $card.find('.sapgs-enable-gateway').prop('checked', true);
+                                $card.find('.sapgs-toggle-label').text('Enabled');
+                                
+                                // Update status indicator
+                                var config = response.data?.config || {};
+                                var isTestMode = config.test_mode === '1' || config.test_mode === true || config.test_mode === 1 || config.test_mode === 'on';
+                                var status = isTestMode ? 'test_mode' : 'connected';
+                                
+                                $card.find('.sapgs-status-indicator')
+                                    .removeClass('status-offline status-not_configured status-intermittent status-connected status-test_mode')
+                                    .addClass('status-' + status);
+                                
+                                // Update test/live badge
+                                var $testLiveBadge = $card.find('.sapgs-badge-warning, .sapgs-badge-success');
+                                if ($testLiveBadge.length === 0) {
+                                    var $actions = $card.find('.sapgs-gateway-actions');
+                                    $actions.append('<span class="sapgs-badge ' + (isTestMode ? 'sapgs-badge-warning' : 'sapgs-badge-success') + '">' + (isTestMode ? 'Test' : 'Live') + '</span>');
+                                } else {
+                                    $testLiveBadge.removeClass('sapgs-badge-warning sapgs-badge-success')
+                                        .addClass(isTestMode ? 'sapgs-badge-warning' : 'sapgs-badge-success')
+                                        .text(isTestMode ? 'Test' : 'Live');
+                                }
+                                
+                                // Remove "not configured" notice
+                                $card.find('.sapgs-notice-warning').remove();
+                                
+                                // Show "Set as Default" button if not default
+                                var isDefault = $card.find('.sapgs-badge-primary').length > 0;
+                                if (!isDefault) {
+                                    var $setDefaultBtn = $card.find('.sapgs-set-default');
+                                    if ($setDefaultBtn.length === 0) {
+                                        var $actions = $card.find('.sapgs-gateway-actions');
+                                        $actions.append('<button class="button sapgs-set-default" data-gateway-id="' + gatewayId + '">Set as Default</button>');
+                                    } else {
+                                        $setDefaultBtn.show();
+                                    }
+                                }
+                            }
                         }
+                        
                         showNotification(message, 'success');
                         $('#sapgs-config-modal').hide();
-                        setTimeout(function() {
-                            location.reload();
-                        }, 1000);
+                        $('#sapgs-config-modal').data('config-saved', true);
                     } else {
                         // Show detailed error message
                         var errorMsg = response.data?.message || 'Failed to save configuration';
@@ -1111,9 +1355,8 @@
                 success: function(response) {
                     if (response.success) {
                         showNotification('Optimization applied successfully!', 'success');
-                        setTimeout(function() {
-                            location.reload();
-                        }, 1500);
+                        // Reload suggestions to show updated state
+                        $('#sapgs-load-suggestions').trigger('click');
                     } else {
                         showNotification(response.data?.message || 'Failed to apply optimization', 'error');
                         $btn.prop('disabled', false).text('Apply Suggestion');
@@ -1263,6 +1506,50 @@
                 }, 300);
             }
         }
+        
+        // Settings form submission
+        $('#sapgs-settings-form').on('submit', function(e) {
+            e.preventDefault();
+            
+            var $form = $(this);
+            var $button = $('#sapgs-save-settings');
+            var $message = $('#sapgs-settings-message');
+            
+            var settings = {
+                failover_enabled: $('#sapgs_failover_enabled').is(':checked') ? '1' : '0',
+                routing_mode: $('#sapgs_routing_mode').val() || 'default'
+            };
+            
+            $.ajax({
+                url: sapgsData.ajaxUrl,
+                type: 'POST',
+                data: {
+                    action: 'sapgs_save_settings',
+                    settings: JSON.stringify(settings),
+                    nonce: sapgsData.nonce
+                },
+                beforeSend: function() {
+                    $button.prop('disabled', true).text('Saving...');
+                    $message.removeClass('success error').text('');
+                },
+                success: function(response) {
+                    $button.prop('disabled', false).text('Save Settings');
+                    
+                    if (response.success) {
+                        $message.addClass('success').text('Settings saved successfully!');
+                        setTimeout(function() {
+                            $message.removeClass('success error').text('');
+                        }, 3000);
+                    } else {
+                        $message.addClass('error').text(response.data?.message || 'Failed to save settings');
+                    }
+                },
+                error: function() {
+                    $button.prop('disabled', false).text('Save Settings');
+                    $message.addClass('error').text('An error occurred. Please try again.');
+                }
+            });
+        });
         
         
     });

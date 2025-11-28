@@ -30,6 +30,133 @@ class SAPGS_Dashboard {
         return $logo_url;
     }
     
+    /**
+     * Get gateway strengths and weaknesses
+     */
+    private static function get_gateway_info($gateway_id) {
+        $info = array(
+            'payfast' => array(
+                'strengths' => array(
+                    'Most established and trusted payment gateway in South Africa',
+                    'Supports credit cards, debit cards, and EFT payments',
+                    'Excellent documentation and developer support',
+                    'Wide merchant acceptance and customer familiarity'
+                ),
+                'weaknesses' => array(
+                    'Higher transaction fees compared to newer competitors',
+                    'Settlement times typically 2-3 business days',
+                    'Less modern API compared to newer gateways'
+                )
+            ),
+            'paygate' => array(
+                'strengths' => array(
+                    'Comprehensive payment solutions with flexible integration',
+                    'Robust security with advanced encryption',
+                    'Good scalability for growing businesses',
+                    'Reliable customer support'
+                ),
+                'weaknesses' => array(
+                    'Settlement times can be 2-3 business days',
+                    'Lower brand recognition in some markets',
+                    'May require more technical setup'
+                )
+            ),
+            'paystackza' => array(
+                'strengths' => array(
+                    'Modern API with excellent developer experience',
+                    'Fast transaction processing',
+                    'Good documentation and developer tools',
+                    'Competitive transaction fees'
+                ),
+                'weaknesses' => array(
+                    'Newer to South African market',
+                    'Less established brand recognition',
+                    'Limited payment method options compared to others'
+                )
+            ),
+            'ozow' => array(
+                'strengths' => array(
+                    'Instant EFT payments for faster settlements',
+                    'Competitive fees, especially for EFT',
+                    'Modern, user-friendly interface',
+                    'Good for recurring payments'
+                ),
+                'weaknesses' => array(
+                    'Primarily focused on EFT, limited card options',
+                    'Less suitable for international transactions',
+                    'Newer platform with less market history'
+                )
+            ),
+            'snapscan' => array(
+                'strengths' => array(
+                    'Popular mobile payment solution',
+                    'Quick and easy QR code payments',
+                    'Good for small businesses and markets',
+                    'Low barrier to entry'
+                ),
+                'weaknesses' => array(
+                    'Limited to mobile payments only',
+                    'Smaller transaction volume capacity',
+                    'Less suitable for large e-commerce sites'
+                )
+            ),
+            'zapper' => array(
+                'strengths' => array(
+                    'Widely recognized mobile payment brand',
+                    'Easy QR code payment integration',
+                    'Good customer adoption in South Africa',
+                    'Simple setup process'
+                ),
+                'weaknesses' => array(
+                    'Mobile payment focused, limited other options',
+                    'May have transaction limits',
+                    'Less comprehensive than full payment gateways'
+                )
+            ),
+            'peachpayments' => array(
+                'strengths' => array(
+                    'Comprehensive payment gateway with multiple options',
+                    'Good international payment support',
+                    'Strong security and compliance',
+                    'Flexible integration options'
+                ),
+                'weaknesses' => array(
+                    'Can be more complex to set up',
+                    'May have higher fees for some transaction types',
+                    'Less brand recognition than Payfast'
+                )
+            ),
+            'stitch' => array(
+                'strengths' => array(
+                    'Modern API-first payment infrastructure',
+                    'Fast integration and developer-friendly',
+                    'Good for subscription and recurring payments',
+                    'Competitive pricing structure'
+                ),
+                'weaknesses' => array(
+                    'Newer platform with less market history',
+                    'Limited payment method variety',
+                    'May require technical expertise for setup'
+                )
+            ),
+            'yoco' => array(
+                'strengths' => array(
+                    'Great for small to medium businesses',
+                    'Simple, transparent pricing',
+                    'Good point-of-sale integration',
+                    'User-friendly dashboard and reporting'
+                ),
+                'weaknesses' => array(
+                    'Primarily focused on card payments',
+                    'Less suitable for large enterprise needs',
+                    'Limited international payment options'
+                )
+            )
+        );
+        
+        return isset($info[$gateway_id]) ? $info[$gateway_id] : array('strengths' => array(), 'weaknesses' => array());
+    }
+    
     public static function render() {
         $plugin = SA_Payment_Gateway_Switcher::get_instance();
         $gateway_manager = $plugin->gateway_manager;
@@ -113,11 +240,24 @@ class SAPGS_Dashboard {
                             $is_default = $default_gateway && $default_gateway->get_id() === $gateway_id;
                             $raw_status = $statuses[$gateway_id] ?? 'not_configured';
                             $is_configured = $gateway->is_configured();
+                            $config = $gateway->get_config();
+                            // Check both test_mode and sandbox fields (different gateways use different field names)
+                            $is_test_mode = false;
+                            if (isset($config['test_mode'])) {
+                                $is_test_mode = ($config['test_mode'] === '1' || $config['test_mode'] === true || $config['test_mode'] === 1 || $config['test_mode'] === 'on');
+                            } elseif (isset($config['sandbox'])) {
+                                $is_test_mode = ($config['sandbox'] === '1' || $config['sandbox'] === true || $config['sandbox'] === 1 || $config['sandbox'] === 'on');
+                            }
                             
-                            // If gateway is enabled and configured, show as connected (green)
+                            // If gateway is enabled and configured, show status based on test mode
+                            // Test mode = orange, Live mode = green
                             // Otherwise use the actual status
                             if ($is_enabled && $is_configured) {
-                                $status = 'connected';
+                                if ($is_test_mode) {
+                                    $status = 'test_mode'; // Orange for test mode
+                                } else {
+                                    $status = 'connected'; // Green for live mode
+                                }
                             } else {
                                 $status = $raw_status;
                             }
@@ -139,7 +279,28 @@ class SAPGS_Dashboard {
                                     <?php endif; ?>
                                     <h3><?php echo esc_html($gateway->get_name()); ?></h3>
                                 </div>
-                                <span class="sapgs-status-indicator status-<?php echo esc_attr($status); ?>"></span>
+                                <div class="sapgs-gateway-header-right">
+                                    <?php 
+                                    $gateway_info = self::get_gateway_info($gateway_id);
+                                    if (!empty($gateway_info['strengths']) || !empty($gateway_info['weaknesses'])):
+                                        $tooltip_lines = array();
+                                        $tooltip_lines[] = 'STRENGTHS:';
+                                        foreach ($gateway_info['strengths'] as $strength) {
+                                            $tooltip_lines[] = '• ' . $strength;
+                                        }
+                                        if (!empty($gateway_info['weaknesses'])) {
+                                            $tooltip_lines[] = '';
+                                            $tooltip_lines[] = 'WEAKNESSES:';
+                                            foreach ($gateway_info['weaknesses'] as $weakness) {
+                                                $tooltip_lines[] = '• ' . $weakness;
+                                            }
+                                        }
+                                        $tooltip_content = implode("\n", $tooltip_lines);
+                                    ?>
+                                    <span class="sapgs-gateway-info-icon" data-tooltip="<?php echo esc_attr($tooltip_content); ?>">i</span>
+                                    <?php endif; ?>
+                                    <span class="sapgs-status-indicator status-<?php echo esc_attr($status); ?>"></span>
+                                </div>
                             </div>
                             <p class="sapgs-gateway-desc"><?php echo esc_html($gateway->get_description()); ?></p>
                             
@@ -164,6 +325,12 @@ class SAPGS_Dashboard {
                                 
                                 <?php if ($is_default): ?>
                                 <span class="sapgs-badge sapgs-badge-primary"><?php echo esc_html__('Default', 'sapgs'); ?></span>
+                                <?php endif; ?>
+                                
+                                <?php if ($is_configured): ?>
+                                <span class="sapgs-badge <?php echo $is_test_mode ? 'sapgs-badge-warning' : 'sapgs-badge-success'; ?>">
+                                    <?php echo $is_test_mode ? esc_html__('Test', 'sapgs') : esc_html__('Live', 'sapgs'); ?>
+                                </span>
                                 <?php endif; ?>
                                 
                                 <button class="button sapgs-configure-gateway" data-gateway-id="<?php echo esc_attr($gateway_id); ?>">
@@ -282,6 +449,26 @@ class SAPGS_Dashboard {
                         <button class="button button-primary" id="sapgs-refresh-analytics"><?php echo esc_html__('Refresh', 'sapgs'); ?></button>
                     </div>
                     
+                    <!-- Fee Comparison Section -->
+                    <div class="sapgs-fee-comparison-section" style="background: var(--sapgs-card-bg); border-radius: 12px; padding: 24px; margin: 20px 0; box-shadow: var(--sapgs-shadow);">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                            <h3 style="margin: 0;"><?php echo esc_html__('Current Best Fees', 'sapgs'); ?></h3>
+                            <div style="display: flex; gap: 12px; align-items: center;">
+                                <label style="font-weight: 600; color: var(--sapgs-text);"><?php echo esc_html__('Test Amount:', 'sapgs'); ?></label>
+                                <input type="number" id="sapgs-fee-test-amount" value="100" min="1" step="0.01" style="width: 120px; padding: 8px; border: 1px solid var(--sapgs-border); border-radius: 8px;">
+                                <button class="button button-secondary" id="sapgs-check-fees-now"><?php echo esc_html__('Check Fees Now', 'sapgs'); ?></button>
+                            </div>
+                        </div>
+                        <p style="color: var(--sapgs-text-secondary); margin: 0 0 20px 0; font-size: 14px;">
+                            <?php echo esc_html__('Fees are automatically checked daily. Compare current fees across all payment gateways to find the best option for your transaction amount.', 'sapgs'); ?>
+                        </p>
+                        <div id="sapgs-fee-comparison-results" style="min-height: 200px;">
+                            <div style="text-align: center; padding: 40px; color: var(--sapgs-text-secondary);">
+                                <p><?php echo esc_html__('Loading fee comparison...', 'sapgs'); ?></p>
+                            </div>
+                        </div>
+                    </div>
+                    
                     <div class="sapgs-analytics-charts">
                         <div class="sapgs-chart-container">
                             <h4><?php echo esc_html__('Fees Comparison', 'sapgs'); ?></h4>
@@ -366,6 +553,7 @@ class SAPGS_Dashboard {
                                     <li style="padding: 8px 0; border-bottom: 1px solid var(--sapgs-border);">✓ Automatic failover routing</li>
                                     <li style="padding: 8px 0; border-bottom: 1px solid var(--sapgs-border);">✓ Load balancing & routing modes</li>
                                     <li style="padding: 8px 0; border-bottom: 1px solid var(--sapgs-border);">✓ Scheduled daily tests</li>
+                                    <li style="padding: 8px 0; border-bottom: 1px solid var(--sapgs-border);">✓ Daily fee monitoring & comparison</li>
                                     <li style="padding: 8px 0; border-bottom: 1px solid var(--sapgs-border);">✓ Optimization suggestions</li>
                                     <li style="padding: 8px 0; border-bottom: 1px solid var(--sapgs-border);">✓ Uptime monitoring</li>
                                 </ul>
@@ -406,9 +594,7 @@ class SAPGS_Dashboard {
                     </div>
                     <?php endif; ?>
                     
-                    <form method="post" action="options.php">
-                        <?php settings_fields('sapgs_settings'); ?>
-                        
+                    <form id="sapgs-settings-form" method="post">
                         <table class="form-table">
                             <tr>
                                 <th scope="row">
@@ -417,7 +603,7 @@ class SAPGS_Dashboard {
                                 </th>
                                 <td>
                                     <label>
-                                        <input type="checkbox" name="sapgs_failover_enabled" value="1" 
+                                        <input type="checkbox" name="sapgs_failover_enabled" id="sapgs_failover_enabled" value="1" 
                                                <?php checked(get_option('sapgs_failover_enabled', false)); ?>
                                                <?php disabled(!$license_info['is_premium']); ?>>
                                         <?php echo esc_html__('Enable automatic failover to backup gateway', 'sapgs'); ?>
@@ -431,7 +617,7 @@ class SAPGS_Dashboard {
                                     <span class="sapgs-help-tooltip" data-tooltip="<?php echo esc_attr__('Determines how payments are distributed across multiple enabled gateways. Default uses primary gateway first, then failover. Approval Rate routes to gateway with highest success rate. Load Balancing distributes evenly.', 'sapgs'); ?>">?</span>
                                 </th>
                                 <td>
-                                    <select name="sapgs_routing_mode">
+                                    <select name="sapgs_routing_mode" id="sapgs_routing_mode">
                                         <option value="default" <?php selected(get_option('sapgs_routing_mode', 'default'), 'default'); ?>>
                                             <?php echo esc_html__('Default (Primary + Failover)', 'sapgs'); ?>
                                         </option>
@@ -447,7 +633,10 @@ class SAPGS_Dashboard {
                             <?php endif; ?>
                         </table>
                         
-                        <?php submit_button(); ?>
+                        <p class="submit">
+                            <button type="submit" class="button button-primary" id="sapgs-save-settings"><?php echo esc_html__('Save Settings', 'sapgs'); ?></button>
+                            <span id="sapgs-settings-message" style="margin-left: 15px;"></span>
+                        </p>
                     </form>
                 </div>
             </div>

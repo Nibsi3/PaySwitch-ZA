@@ -275,5 +275,9 @@ class SAPGS_OzowGateway implements SAPGS_GatewayInterface {
             'fixed' => 1.50
         );
     }
+    
+    public function get_credential_url($test_mode = false) {
+        return 'https://dashboard.ozow.com';
+    }
 }
 

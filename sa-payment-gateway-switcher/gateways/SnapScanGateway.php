@@ -246,5 +246,9 @@ class SAPGS_SnapScanGateway implements SAPGS_GatewayInterface {
             'fixed' => 0.00
         );
     }
+    
+    public function get_credential_url($test_mode = false) {
+        return 'https://merchant.snapscan.co.za';
+    }
 }
 

@@ -48,12 +48,14 @@ spl_autoload_register(function ($class) {
 // Load core classes
 require_once SAPGS_PLUGIN_DIR . 'core/GatewayInterface.php';
 require_once SAPGS_PLUGIN_DIR . 'core/GatewayManager.php';
+require_once SAPGS_PLUGIN_DIR . 'core/FeeMonitor.php';
 require_once SAPGS_PLUGIN_DIR . 'core/LicenseManager.php';
 require_once SAPGS_PLUGIN_DIR . 'core/Logger.php';
 require_once SAPGS_PLUGIN_DIR . 'core/Metrics.php';
 require_once SAPGS_PLUGIN_DIR . 'core/SandboxTester.php';
 require_once SAPGS_PLUGIN_DIR . 'core/OptimizationEngine.php';
 require_once SAPGS_PLUGIN_DIR . 'core/UptimeMonitor.php';
+require_once SAPGS_PLUGIN_DIR . 'core/FeeMonitor.php';
 
 // Load gateway classes
 require_once SAPGS_PLUGIN_DIR . 'gateways/PayfastGateway.php';
@@ -83,6 +85,7 @@ class SA_Payment_Gateway_Switcher {
     public $sandbox_tester;
     public $optimization_engine;
     public $uptime_monitor;
+    public $fee_monitor;
     
     public static function get_instance() {
         if (null === self::$instance) {
@@ -107,6 +110,7 @@ class SA_Payment_Gateway_Switcher {
         $this->sandbox_tester = new SAPGS_SandboxTester();
         $this->optimization_engine = new SAPGS_OptimizationEngine();
         $this->uptime_monitor = new SAPGS_UptimeMonitor();
+        $this->fee_monitor = new SAPGS_FeeMonitor();
         
         // Admin hooks
         if (is_admin()) {
@@ -132,6 +136,9 @@ class SA_Payment_Gateway_Switcher {
         add_action('wp_ajax_sapgs_get_gateway_config', array($this, 'ajax_get_gateway_config'));
         add_action('wp_ajax_sapgs_get_sorting_data', array($this, 'ajax_get_sorting_data'));
         add_action('wp_ajax_sapgs_save_gateway_order', array($this, 'ajax_save_gateway_order'));
+        add_action('wp_ajax_sapgs_get_fee_comparison', array($this, 'ajax_get_fee_comparison'));
+        add_action('wp_ajax_sapgs_check_fees_now', array($this, 'ajax_check_fees_now'));
+        add_action('wp_ajax_sapgs_save_settings', array($this, 'ajax_save_settings'));
     }
     
     public function check_woocommerce() {
@@ -762,6 +769,116 @@ class SA_Payment_Gateway_Switcher {
         
         wp_send_json_success(array('message' => 'Gateway order saved'));
     }
+    
+    public function ajax_get_fee_comparison() {
+        check_ajax_referer('sapgs_nonce', 'nonce');
+        
+        if (!current_user_can('manage_options')) {
+            wp_send_json_error(array('message' => 'Unauthorized'));
+        }
+        
+        if (!$this->license_manager->is_premium_active()) {
+            wp_send_json_error(array('message' => 'Fee comparison is a premium feature'));
+        }
+        
+        $amount = isset($_POST['amount']) ? floatval($_POST['amount']) : 100;
+        
+        $fee_monitor = new SAPGS_FeeMonitor();
+        $all_fees = $fee_monitor->get_all_current_fees();
+        $best_gateway = $fee_monitor->get_best_fee_gateway($amount);
+        
+        // Calculate costs for each gateway
+        $comparison = array();
+        $gateway_manager = new SAPGS_GatewayManager();
+        
+        foreach ($all_fees as $gateway_id => $fees) {
+            $gateway = $gateway_manager->get_gateway($gateway_id);
+            if ($gateway) {
+                $cost = $fee_monitor->calculate_fee_cost($gateway_id, $amount);
+                $comparison[$gateway_id] = array(
+                    'name' => $gateway->get_name(),
+                    'percentage' => $fees['percentage'],
+                    'fixed' => $fees['fixed'],
+                    'cost' => $cost,
+                    'checked_at' => $fees['checked_at'],
+                    'is_best' => $best_gateway && $best_gateway['gateway_id'] === $gateway_id
+                );
+            }
+        }
+        
+        // Sort by cost
+        uasort($comparison, function($a, $b) {
+            return $a['cost'] <=> $b['cost'];
+        });
+        
+        wp_send_json_success(array(
+            'comparison' => $comparison,
+            'best_gateway' => $best_gateway,
+            'test_amount' => $amount
+        ));
+    }
+    
+    public function ajax_check_fees_now() {
+        check_ajax_referer('sapgs_nonce', 'nonce');
+        
+        if (!current_user_can('manage_options')) {
+            wp_send_json_error(array('message' => 'Unauthorized'));
+        }
+        
+        if (!$this->license_manager->is_premium_active()) {
+            wp_send_json_error(array('message' => 'Fee checking is a premium feature'));
+        }
+        
+        $gateway_id = isset($_POST['gateway_id']) ? sanitize_text_field($_POST['gateway_id']) : null;
+        
+        $fee_monitor = new SAPGS_FeeMonitor();
+        
+        if ($gateway_id) {
+            // Check specific gateway
+            $fees = $fee_monitor->check_gateway_fees($gateway_id);
+            wp_send_json_success(array(
+                'gateway_id' => $gateway_id,
+                'fees' => $fees,
+                'message' => 'Fees checked successfully'
+            ));
+        } else {
+            // Check all gateways
+            $fee_monitor->check_all_gateways_fees();
+            wp_send_json_success(array(
+                'message' => 'All gateway fees checked successfully'
+            ));
+        }
+    }
+    
+    public function ajax_save_settings() {
+        check_ajax_referer('sapgs_nonce', 'nonce');
+        
+        if (!current_user_can('manage_options')) {
+            wp_send_json_error(array('message' => 'Unauthorized'));
+        }
+        
+        $settings = isset($_POST['settings']) ? json_decode(stripslashes($_POST['settings']), true) : array();
+        
+        if (!is_array($settings)) {
+            wp_send_json_error(array('message' => 'Invalid settings data'));
+        }
+        
+        // Save failover enabled setting
+        if (isset($settings['failover_enabled'])) {
+            $failover_enabled = ($settings['failover_enabled'] === '1' || $settings['failover_enabled'] === true || $settings['failover_enabled'] === 1);
+            update_option('sapgs_failover_enabled', $failover_enabled);
+        }
+        
+        // Save routing mode setting (premium only)
+        if (isset($settings['routing_mode']) && $this->license_manager->is_premium_active()) {
+            $routing_mode = sanitize_text_field($settings['routing_mode']);
+            if (in_array($routing_mode, array('default', 'approval_rate', 'load_balance'))) {
+                update_option('sapgs_routing_mode', $routing_mode);
+            }
+        }
+        
+        wp_send_json_success(array('message' => 'Settings saved successfully'));
+    }
 }
 
 /**
@@ -824,10 +941,25 @@ register_activation_hook(__FILE__, function() {
         KEY is_up (is_up)
     ) $charset_collate;";
     
+    // Fee monitoring table
+    $table_fees = $wpdb->prefix . 'sapgs_fees';
+    $sql_fees = "CREATE TABLE $table_fees (
+        id bigint(20) NOT NULL AUTO_INCREMENT,
+        gateway_id varchar(50) NOT NULL,
+        percentage_fee decimal(5,2) NOT NULL,
+        fixed_fee decimal(10,2) NOT NULL,
+        checked_at datetime DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY (id),
+        KEY gateway_id (gateway_id),
+        KEY checked_at (checked_at),
+        KEY percentage_fee (percentage_fee)
+    ) $charset_collate;";
+    
     require_once(ABSPATH . 'wp-admin/includes/upgrade.php');
     dbDelta($sql_logs);
     dbDelta($sql_tests);
     dbDelta($sql_uptime);
+    dbDelta($sql_fees);
     
     // Set default options
     add_option('sapgs_version', SAPGS_VERSION);
@@ -841,6 +973,7 @@ register_activation_hook(__FILE__, function() {
 register_deactivation_hook(__FILE__, function() {
     // Clean up scheduled events if any
     wp_clear_scheduled_hook('sapgs_daily_tests');
+    wp_clear_scheduled_hook('sapgs_daily_fee_check');
 });
 
 // Initialize plugin

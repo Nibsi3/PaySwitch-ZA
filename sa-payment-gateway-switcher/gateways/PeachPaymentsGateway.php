@@ -254,5 +254,12 @@ class SAPGS_PeachPaymentsGateway implements SAPGS_GatewayInterface {
             'fixed' => 1.50
         );
     }
+    
+    public function get_credential_url($test_mode = false) {
+        if ($test_mode) {
+            return 'https://test.peachpayments.com';
+        }
+        return 'https://www.peachpayments.com';
+    }
 }
 

@@ -246,5 +246,9 @@ class SAPGS_PaystackZAGateway implements SAPGS_GatewayInterface {
             'fixed' => 2.00
         );
     }
+    
+    public function get_credential_url($test_mode = false) {
+        return 'https://dashboard.paystack.com/#/settings/developer';
+    }
 }
 

@@ -279,5 +279,9 @@ class SAPGS_StitchGateway implements SAPGS_GatewayInterface {
             'fixed' => 1.00
         );
     }
+    
+    public function get_credential_url($test_mode = false) {
+        return 'https://www.stitch.money';
+    }
 }
 

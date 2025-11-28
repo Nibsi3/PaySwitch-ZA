@@ -279,5 +279,12 @@ class SAPGS_PayfastGateway implements SAPGS_GatewayInterface {
             'fixed' => 2.00
         );
     }
+    
+    public function get_credential_url($test_mode = false) {
+        if ($test_mode) {
+            return 'https://sandbox.payfast.co.za/user/login';
+        }
+        return 'https://www.payfast.co.za/user/login';
+    }
 }
 
