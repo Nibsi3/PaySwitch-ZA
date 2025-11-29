@@ -32,7 +32,10 @@ class SAPGS_GatewayManager {
             'paystack_za' => new SAPGS_PaystackZAGateway(),
             'snapscan' => new SAPGS_SnapScanGateway(),
             'zapper' => new SAPGS_ZapperGateway(),
-            'stitch' => new SAPGS_StitchGateway()
+            'stitch' => new SAPGS_StitchGateway(),
+            'instant_eft' => new SAPGS_InstantEFTGateway(),
+            'payu' => new SAPGS_PayUGateway(),
+            'ikhokha' => new SAPGS_iKhokhaGateway()
         );
     }
     
@@ -122,19 +125,71 @@ class SAPGS_GatewayManager {
         }
         
         $last_error = null;
+        $primary_gateway_id = null;
+        $failover_start_time = null;
+        $attempts = array();
         
-        foreach ($gateways_to_try as $gateway) {
+        foreach ($gateways_to_try as $index => $gateway) {
+            $gateway_id = $gateway->get_id();
+            $attempt_start = microtime(true);
+            
+            // Track primary gateway
+            if ($index === 0) {
+                $primary_gateway_id = $gateway_id;
+                $failover_start_time = $attempt_start;
+            }
+            
             try {
                 $result = $gateway->charge($amount, $data);
                 if ($result['success']) {
+                    // Success - if this was a failover, record it
+                    if ($index > 0 && $primary_gateway_id && $failover_enabled) {
+                        $recovery_time = round((microtime(true) - $failover_start_time) * 1000);
+                        $failover_tracker = new SAPGS_FailoverTracker();
+                        $failover_tracker->record_failover(
+                            $primary_gateway_id,
+                            $gateway_id,
+                            $data['order_id'] ?? null,
+                            $amount,
+                            $last_error['message'] ?? 'Primary gateway failed',
+                            $recovery_time
+                        );
+                    }
                     return $result;
                 }
                 $last_error = $result;
+                $attempts[] = array(
+                    'gateway_id' => $gateway_id,
+                    'error' => $result['message'] ?? 'Unknown error',
+                    'time' => round((microtime(true) - $attempt_start) * 1000)
+                );
             } catch (Exception $e) {
                 $last_error = array(
                     'success' => false,
                     'message' => $e->getMessage()
                 );
+                $attempts[] = array(
+                    'gateway_id' => $gateway_id,
+                    'error' => $e->getMessage(),
+                    'time' => round((microtime(true) - $attempt_start) * 1000)
+                );
+            }
+        }
+        
+        // All gateways failed - record failover attempts if applicable
+        if ($failover_enabled && $primary_gateway_id && count($attempts) > 1) {
+            $failover_tracker = new SAPGS_FailoverTracker();
+            foreach ($attempts as $index => $attempt) {
+                if ($index > 0) {
+                    $failover_tracker->record_failover(
+                        $primary_gateway_id,
+                        $attempt['gateway_id'],
+                        $data['order_id'] ?? null,
+                        $amount,
+                        $attempt['error'],
+                        null // No recovery since all failed
+                    );
+                }
             }
         }
         

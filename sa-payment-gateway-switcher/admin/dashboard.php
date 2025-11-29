@@ -61,6 +61,19 @@ class SAPGS_Dashboard {
                     'May require more technical setup'
                 )
             ),
+            'paystack_za' => array(
+                'strengths' => array(
+                    'Modern API with excellent developer experience',
+                    'Fast transaction processing',
+                    'Good documentation and developer tools',
+                    'Competitive transaction fees'
+                ),
+                'weaknesses' => array(
+                    'Newer to South African market',
+                    'Less established brand recognition',
+                    'Limited payment method options compared to others'
+                )
+            ),
             'paystackza' => array(
                 'strengths' => array(
                     'Modern API with excellent developer experience',
@@ -113,6 +126,19 @@ class SAPGS_Dashboard {
                     'Less comprehensive than full payment gateways'
                 )
             ),
+            'peach_payments' => array(
+                'strengths' => array(
+                    'Comprehensive payment gateway with multiple options',
+                    'Good international payment support',
+                    'Strong security and compliance',
+                    'Flexible integration options'
+                ),
+                'weaknesses' => array(
+                    'Can be more complex to set up',
+                    'May have higher fees for some transaction types',
+                    'Less brand recognition than Payfast'
+                )
+            ),
             'peachpayments' => array(
                 'strengths' => array(
                     'Comprehensive payment gateway with multiple options',
@@ -150,6 +176,45 @@ class SAPGS_Dashboard {
                     'Primarily focused on card payments',
                     'Less suitable for large enterprise needs',
                     'Limited international payment options'
+                )
+            ),
+            'ikhokha' => array(
+                'strengths' => array(
+                    'Affordable payment solutions for small businesses',
+                    'Easy setup and integration',
+                    'Good customer support',
+                    'Competitive transaction fees'
+                ),
+                'weaknesses' => array(
+                    'Newer to the market',
+                    'Limited payment method options',
+                    'Less established than major gateways'
+                )
+            ),
+            'instant_eft' => array(
+                'strengths' => array(
+                    'Instant EFT payments with real-time verification',
+                    'Lower fees than card payments (typically 1.5-2%)',
+                    'Faster settlement times',
+                    'Good for South African banks'
+                ),
+                'weaknesses' => array(
+                    'Limited to EFT payments only',
+                    'Requires bank account verification',
+                    'Less suitable for international customers'
+                )
+            ),
+            'payu' => array(
+                'strengths' => array(
+                    'Comprehensive payment gateway solution',
+                    'Supports multiple payment methods',
+                    'Good for international transactions',
+                    'Robust API and documentation'
+                ),
+                'weaknesses' => array(
+                    'Can be complex to set up',
+                    'May have higher fees for some transaction types',
+                    'Less brand recognition in South Africa'
                 )
             )
         );
@@ -212,19 +277,26 @@ class SAPGS_Dashboard {
                     <a href="#gateways" class="sapgs-tab-link active" data-tab="gateways"><?php echo esc_html__('Gateways', 'sapgs'); ?></a>
                     <a href="#testing" class="sapgs-tab-link" data-tab="testing"><?php echo esc_html__('Testing', 'sapgs'); ?></a>
                     <a href="#logs" class="sapgs-tab-link" data-tab="logs"><?php echo esc_html__('Logs', 'sapgs'); ?></a>
+                    <a href="#rankings" class="sapgs-tab-link" data-tab="rankings"><?php echo esc_html__('Rankings', 'sapgs'); ?></a>
+                    <a href="#analytics" class="sapgs-tab-link" data-tab="analytics">
+                        <?php echo esc_html__('Analytics', 'sapgs'); ?>
+                        <?php if (!$license_info['is_premium']): ?>
+                        <span style="font-size: 10px; margin-left: 4px; opacity: 0.7;">(Preview)</span>
+                        <?php endif; ?>
+                    </a>
                     <?php if ($license_info['is_premium']): ?>
-                    <a href="#analytics" class="sapgs-tab-link" data-tab="analytics"><?php echo esc_html__('Analytics', 'sapgs'); ?></a>
+                    <a href="#failover-report" class="sapgs-tab-link" data-tab="failover-report"><?php echo esc_html__('Failover Report', 'sapgs'); ?></a>
                     <?php endif; ?>
+                    <a href="#webhooks" class="sapgs-tab-link" data-tab="webhooks"><?php echo esc_html__('Webhooks', 'sapgs'); ?></a>
                     <a href="#premium" class="sapgs-tab-link" data-tab="premium"><?php echo esc_html__('Premium', 'sapgs'); ?></a>
                     <a href="#settings" class="sapgs-tab-link" data-tab="settings"><?php echo esc_html__('Settings', 'sapgs'); ?></a>
                 </nav>
                 
                 <!-- Gateways Tab -->
                 <div id="gateways" class="sapgs-tab-content active">
-                    <?php if ($license_info['is_premium']): ?>
                     <div class="sapgs-sort-controls" style="margin-bottom: 20px; display: flex; align-items: center; gap: 12px; padding: 16px; background: var(--sapgs-card-bg); border-radius: 12px; box-shadow: var(--sapgs-shadow);">
                         <label for="sapgs-sort-by" style="font-weight: 600; color: var(--sapgs-text); margin: 0;"><?php echo esc_html__('Sort by:', 'sapgs'); ?></label>
-                        <select id="sapgs-sort-by" style="padding: 8px 12px; border: 1px solid var(--sapgs-border); border-radius: 8px; background: white; color: var(--sapgs-text); font-size: 14px; min-width: 220px;">
+                        <select id="sapgs-sort-by" style="padding: 8px 12px; border: 1px solid var(--sapgs-border); border-radius: 8px; background: white; color: var(--sapgs-text); font-size: 14px; min-width: 220px;" <?php disabled(!$license_info['is_premium']); ?>>
                             <option value="smart_weighted" <?php selected($sort_type, 'smart_weighted'); ?>><?php echo esc_html__('Smart Weighted Score (Recommended)', 'sapgs'); ?></option>
                             <option value="approval_rate" <?php selected($sort_type, 'approval_rate'); ?>><?php echo esc_html__('Highest Approval Rate', 'sapgs'); ?></option>
                             <option value="success_rate" <?php selected($sort_type, 'success_rate'); ?>><?php echo esc_html__('Highest Success Rate', 'sapgs'); ?></option>
@@ -232,8 +304,10 @@ class SAPGS_Dashboard {
                             <option value="fastest_response" <?php selected($sort_type, 'fastest_response'); ?>><?php echo esc_html__('Fastest Response Time', 'sapgs'); ?></option>
                             <option value="highest_uptime" <?php selected($sort_type, 'highest_uptime'); ?>><?php echo esc_html__('Highest Uptime', 'sapgs'); ?></option>
                         </select>
+                        <?php if (!$license_info['is_premium']): ?>
+                        <span class="sapgs-premium-badge" style="font-size: 11px; color: var(--sapgs-primary); font-weight: 600; margin-left: 8px;"><?php echo esc_html__('Premium Feature', 'sapgs'); ?></span>
+                        <?php endif; ?>
                     </div>
-                    <?php endif; ?>
                     <div class="sapgs-gateways-grid">
                         <?php foreach ($all_gateways as $gateway_id => $gateway): 
                             $is_enabled = isset($enabled_gateways[$gateway_id]);
@@ -265,7 +339,7 @@ class SAPGS_Dashboard {
                         <?php
                             $enabled_count = count($enabled_gateways);
                             $is_premium = $license_info['is_premium'];
-                            $max_free_gateways = 2;
+                            $max_free_gateways = 1;
                             $can_enable_more = $is_premium || ($enabled_count < $max_free_gateways) || $is_enabled;
                         ?>
                         <div class="sapgs-gateway-card" data-gateway-id="<?php echo esc_attr($gateway_id); ?>" data-enabled="<?php echo $is_enabled ? 'true' : 'false'; ?>" data-original-status="<?php echo esc_attr($raw_status); ?>">
@@ -282,23 +356,35 @@ class SAPGS_Dashboard {
                                 <div class="sapgs-gateway-header-right">
                                     <?php 
                                     $gateway_info = self::get_gateway_info($gateway_id);
-                                    if (!empty($gateway_info['strengths']) || !empty($gateway_info['weaknesses'])):
-                                        $tooltip_lines = array();
-                                        $tooltip_lines[] = 'STRENGTHS:';
-                                        foreach ($gateway_info['strengths'] as $strength) {
-                                            $tooltip_lines[] = '• ' . $strength;
+                                    $tooltip_lines = array();
+                                    
+                                    if (!empty($gateway_info['strengths']) || !empty($gateway_info['weaknesses'])) {
+                                        if (!empty($gateway_info['strengths'])) {
+                                            $tooltip_lines[] = 'STRENGTHS:';
+                                            foreach ($gateway_info['strengths'] as $strength) {
+                                                $tooltip_lines[] = '• ' . $strength;
+                                            }
                                         }
                                         if (!empty($gateway_info['weaknesses'])) {
-                                            $tooltip_lines[] = '';
+                                            if (!empty($tooltip_lines)) {
+                                                $tooltip_lines[] = '';
+                                            }
                                             $tooltip_lines[] = 'WEAKNESSES:';
                                             foreach ($gateway_info['weaknesses'] as $weakness) {
                                                 $tooltip_lines[] = '• ' . $weakness;
                                             }
                                         }
-                                        $tooltip_content = implode("\n", $tooltip_lines);
+                                    } else {
+                                        // Default tooltip if no specific info available
+                                        $tooltip_lines[] = 'Gateway Information';
+                                        $tooltip_lines[] = '';
+                                        $tooltip_lines[] = 'This payment gateway is available for configuration.';
+                                        $tooltip_lines[] = 'Configure the gateway to see detailed information.';
+                                    }
+                                    
+                                    $tooltip_content = implode("\n", $tooltip_lines);
                                     ?>
                                     <span class="sapgs-gateway-info-icon" data-tooltip="<?php echo esc_attr($tooltip_content); ?>">i</span>
-                                    <?php endif; ?>
                                     <span class="sapgs-status-indicator status-<?php echo esc_attr($status); ?>"></span>
                                 </div>
                             </div>
@@ -388,7 +474,17 @@ class SAPGS_Dashboard {
                                         <span class="sapgs-metric-value sapgs-test-health-score"></span>
                                     </div>
                                 </div>
+                                <div class="sapgs-performance-badge" style="margin-top: 15px; padding: 12px; border-radius: 8px; display: none;">
+                                    <strong style="display: block; margin-bottom: 8px;"><?php echo esc_html__('Performance Badge:', 'sapgs'); ?></strong>
+                                    <span class="sapgs-badge-text" style="display: inline-block; padding: 6px 12px; border-radius: 6px; font-weight: 600; font-size: 13px;"></span>
+                                </div>
                                 <div class="sapgs-test-message"></div>
+                                <?php if (!$license_info['is_premium']): ?>
+                                <div class="sapgs-test-receipt" style="margin-top: 20px; padding: 16px; background: var(--sapgs-bg); border-radius: 8px; border: 1px solid var(--sapgs-border); display: none;">
+                                    <h4 style="margin-top: 0;"><?php echo esc_html__('Test Summary', 'sapgs'); ?></h4>
+                                    <div class="sapgs-receipt-content"></div>
+                                </div>
+                                <?php endif; ?>
                             </div>
                         </div>
                         <?php endforeach; ?>
@@ -433,6 +529,95 @@ class SAPGS_Dashboard {
                             </tr>
                         </tbody>
                     </table>
+                </div>
+                
+                <!-- Rankings Tab -->
+                <div id="rankings" class="sapgs-tab-content">
+                    <h2><?php echo esc_html__('Gateway Rankings', 'sapgs'); ?></h2>
+                    <p><?php echo esc_html__('See how payment gateways compare based on performance metrics', 'sapgs'); ?></p>
+                    
+                    <div style="margin-bottom: 20px; display: flex; gap: 12px; align-items: center;">
+                        <label>
+                            <input type="checkbox" id="sapgs-use-live-data" <?php checked($license_info['is_premium']); ?> <?php disabled(!$license_info['is_premium']); ?>>
+                            <?php echo esc_html__('Use Live Store Data', 'sapgs'); ?>
+                        </label>
+                        <?php if (!$license_info['is_premium']): ?>
+                        <span class="sapgs-premium-badge" style="font-size: 11px; color: var(--sapgs-primary); font-weight: 600;"><?php echo esc_html__('Premium Feature', 'sapgs'); ?></span>
+                        <?php endif; ?>
+                        <button class="button" id="sapgs-refresh-rankings"><?php echo esc_html__('Refresh Rankings', 'sapgs'); ?></button>
+                    </div>
+                    
+                    <div id="sapgs-rankings-container" style="background: var(--sapgs-card-bg); border-radius: 12px; padding: 24px; box-shadow: var(--sapgs-shadow);">
+                        <div class="sapgs-loading"><?php echo esc_html__('Loading rankings...', 'sapgs'); ?></div>
+                    </div>
+                </div>
+                
+                <!-- Failover Report Tab (Premium) -->
+                <?php if ($license_info['is_premium']): ?>
+                <div id="failover-report" class="sapgs-tab-content">
+                    <h2><?php echo esc_html__('Failover Report', 'sapgs'); ?></h2>
+                    <p><?php echo esc_html__('Track and analyze failover events to identify unreliable gateways', 'sapgs'); ?></p>
+                    
+                    <div style="margin-bottom: 20px; display: flex; gap: 12px; align-items: center;">
+                        <select id="sapgs-failover-days">
+                            <option value="7"><?php echo esc_html__('Last 7 days', 'sapgs'); ?></option>
+                            <option value="30" selected><?php echo esc_html__('Last 30 days', 'sapgs'); ?></option>
+                            <option value="90"><?php echo esc_html__('Last 90 days', 'sapgs'); ?></option>
+                        </select>
+                        <button class="button button-primary" id="sapgs-load-failover-report"><?php echo esc_html__('Load Report', 'sapgs'); ?></button>
+                    </div>
+                    
+                    <div id="sapgs-failover-report-container" style="background: var(--sapgs-card-bg); border-radius: 12px; padding: 24px; box-shadow: var(--sapgs-shadow);">
+                        <p style="color: var(--sapgs-text-light);"><?php echo esc_html__('Click "Load Report" to view failover statistics', 'sapgs'); ?></p>
+                    </div>
+                </div>
+                <?php endif; ?>
+                
+                <!-- Webhooks Tab -->
+                <div id="webhooks" class="sapgs-tab-content">
+                    <h2><?php echo esc_html__('Webhook Management', 'sapgs'); ?></h2>
+                    
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 30px;">
+                        <!-- Webhook Health Checks -->
+                        <div style="background: var(--sapgs-card-bg); border-radius: 12px; padding: 20px; box-shadow: var(--sapgs-shadow);">
+                            <h3 style="margin-top: 0;"><?php echo esc_html__('Webhook Health Checks', 'sapgs'); ?></h3>
+                            <p style="color: var(--sapgs-text-light); font-size: 14px;"><?php echo esc_html__('Check if webhook endpoints are reachable and signatures are valid', 'sapgs'); ?></p>
+                            <button class="button button-primary" id="sapgs-check-all-webhooks" style="margin-top: 15px;">
+                                <?php echo esc_html__('Check All Gateways', 'sapgs'); ?>
+                            </button>
+                            <div id="sapgs-webhook-health-results" style="margin-top: 20px;"></div>
+                        </div>
+                        
+                        <!-- Test Mode Webhook Listener (Free) -->
+                        <div style="background: var(--sapgs-card-bg); border-radius: 12px; padding: 20px; box-shadow: var(--sapgs-shadow);">
+                            <h3 style="margin-top: 0;"><?php echo esc_html__('Test Mode Webhook Listener', 'sapgs'); ?></h3>
+                            <p style="color: var(--sapgs-text-light); font-size: 14px;"><?php echo esc_html__('View incoming webhook events in test mode', 'sapgs'); ?></p>
+                            <button class="button" id="sapgs-load-webhook-events" style="margin-top: 15px;">
+                                <?php echo esc_html__('View Recent Events', 'sapgs'); ?>
+                            </button>
+                            <div id="sapgs-webhook-events-list" style="margin-top: 20px; max-height: 400px; overflow-y: auto;"></div>
+                        </div>
+                    </div>
+                    
+                    <!-- Payment Simulation (Premium) -->
+                    <?php if ($license_info['is_premium']): ?>
+                    <div style="background: var(--sapgs-card-bg); border-radius: 12px; padding: 20px; box-shadow: var(--sapgs-shadow); margin-top: 20px;">
+                        <h3 style="margin-top: 0;"><?php echo esc_html__('Checkout Payment Simulation', 'sapgs'); ?></h3>
+                        <p style="color: var(--sapgs-text-light); font-size: 14px;"><?php echo esc_html__('Simulate a full checkout flow to test connectivity, API response, and webhook roundtrip', 'sapgs'); ?></p>
+                        <div style="display: flex; gap: 12px; align-items: center; margin-top: 15px;">
+                            <select id="sapgs-simulate-gateway" style="min-width: 200px;">
+                                <?php foreach ($all_gateways as $gateway_id => $gateway): ?>
+                                <option value="<?php echo esc_attr($gateway_id); ?>"><?php echo esc_html($gateway->get_name()); ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                            <input type="number" id="sapgs-simulate-amount" value="100.00" step="0.01" min="0" style="width: 120px;" placeholder="Amount">
+                            <button class="button button-primary" id="sapgs-run-simulation">
+                                <?php echo esc_html__('Run Simulation', 'sapgs'); ?>
+                            </button>
+                        </div>
+                        <div id="sapgs-simulation-results" style="margin-top: 20px;"></div>
+                    </div>
+                    <?php endif; ?>
                 </div>
                 
                 <!-- Analytics Tab (Premium) -->
@@ -500,12 +685,104 @@ class SAPGS_Dashboard {
                         </div>
                     </div>
                 </div>
-                <?php else: ?>
+                <?php else: 
+                    // Show benchmark preview for free users
+                    $benchmarks = SAPGS_BenchmarkData::get_all_benchmarks();
+                ?>
                 <div id="analytics" class="sapgs-tab-content">
-                    <div class="sapgs-premium-locked">
-                        <h2><?php echo esc_html__('Analytics is a Premium Feature', 'sapgs'); ?></h2>
-                        <p><?php echo esc_html__('Upgrade to premium to unlock advanced analytics, comparison charts, and performance insights.', 'sapgs'); ?></p>
-                        <a href="#premium" class="button button-primary sapgs-tab-link" data-tab="premium"><?php echo esc_html__('Upgrade Now', 'sapgs'); ?></a>
+                    <div style="background: linear-gradient(135deg, rgba(79, 70, 229, 0.05) 0%, rgba(124, 58, 237, 0.05) 100%); border: 2px dashed var(--sapgs-border); border-radius: 16px; padding: 30px; margin-bottom: 30px;">
+                        <h2 style="margin-top: 0; color: var(--sapgs-text);"><?php echo esc_html__('Gateway Benchmark Preview', 'sapgs'); ?></h2>
+                        <p style="color: var(--sapgs-text-light); margin-bottom: 20px;">
+                            <?php echo esc_html__('Below are nationwide average benchmarks for South African payment gateways. Upgrade to Premium to see your store-specific analytics, real-time performance data, and historical trends.', 'sapgs'); ?>
+                        </p>
+                        <a href="#premium" class="button button-primary sapgs-tab-link" data-tab="premium" style="margin-top: 10px;"><?php echo esc_html__('Upgrade to Premium for Real Analytics', 'sapgs'); ?></a>
+                    </div>
+                    
+                    <!-- Benchmark Success Rates -->
+                    <div class="sapgs-chart-container" style="position: relative;">
+                        <div class="sapgs-premium-overlay" style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(2px); z-index: 10; display: flex; align-items: center; justify-content: center; border-radius: 12px;">
+                            <div style="text-align: center; padding: 20px;">
+                                <span class="dashicons dashicons-lock" style="font-size: 32px; color: var(--sapgs-primary); margin-bottom: 10px;"></span>
+                                <p style="font-weight: 600; color: var(--sapgs-text); margin: 10px 0;"><?php echo esc_html__('Premium Feature', 'sapgs'); ?></p>
+                                <p style="color: var(--sapgs-text-light); font-size: 13px;"><?php echo esc_html__('Unlock real-time analytics', 'sapgs'); ?></p>
+                            </div>
+                        </div>
+                        <h4><?php echo esc_html__('Average Success Rates (Nationwide Benchmark)', 'sapgs'); ?></h4>
+                        <div class="sapgs-benchmark-list" style="margin-top: 20px;">
+                            <?php foreach ($benchmarks['success_rates'] as $gateway_id => $data): 
+                                $gateway = $gateway_manager->get_gateway($gateway_id);
+                                if (!$gateway) continue;
+                            ?>
+                            <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px; border-bottom: 1px solid var(--sapgs-border);">
+                                <div>
+                                    <strong><?php echo esc_html($gateway->get_name()); ?></strong>
+                                    <p style="margin: 4px 0 0 0; font-size: 12px; color: var(--sapgs-text-light);"><?php echo esc_html($data['description']); ?></p>
+                                </div>
+                                <div style="text-align: right;">
+                                    <strong style="font-size: 18px; color: var(--sapgs-primary);"><?php echo esc_html($data['rate']); ?>%</strong>
+                                    <p style="margin: 4px 0 0 0; font-size: 11px; color: var(--sapgs-text-light);"><?php echo esc_html($data['range']); ?></p>
+                                </div>
+                            </div>
+                            <?php endforeach; ?>
+                        </div>
+                    </div>
+                    
+                    <!-- Benchmark Response Times -->
+                    <div class="sapgs-chart-container" style="position: relative;">
+                        <div class="sapgs-premium-overlay" style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(2px); z-index: 10; display: flex; align-items: center; justify-content: center; border-radius: 12px;">
+                            <div style="text-align: center; padding: 20px;">
+                                <span class="dashicons dashicons-lock" style="font-size: 32px; color: var(--sapgs-primary); margin-bottom: 10px;"></span>
+                                <p style="font-weight: 600; color: var(--sapgs-text); margin: 10px 0;"><?php echo esc_html__('Premium Feature', 'sapgs'); ?></p>
+                                <p style="color: var(--sapgs-text-light); font-size: 13px;"><?php echo esc_html__('Unlock real-time analytics', 'sapgs'); ?></p>
+                            </div>
+                        </div>
+                        <h4><?php echo esc_html__('Average Response Times (Nationwide Benchmark)', 'sapgs'); ?></h4>
+                        <div class="sapgs-benchmark-list" style="margin-top: 20px;">
+                            <?php foreach ($benchmarks['response_times'] as $gateway_id => $data): 
+                                $gateway = $gateway_manager->get_gateway($gateway_id);
+                                if (!$gateway) continue;
+                            ?>
+                            <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px; border-bottom: 1px solid var(--sapgs-border);">
+                                <div>
+                                    <strong><?php echo esc_html($gateway->get_name()); ?></strong>
+                                    <p style="margin: 4px 0 0 0; font-size: 12px; color: var(--sapgs-text-light);"><?php echo esc_html($data['description']); ?></p>
+                                </div>
+                                <div style="text-align: right;">
+                                    <strong style="font-size: 18px; color: var(--sapgs-primary);"><?php echo esc_html($data['avg']); ?>ms</strong>
+                                    <p style="margin: 4px 0 0 0; font-size: 11px; color: var(--sapgs-text-light);"><?php echo esc_html($data['range']); ?></p>
+                                </div>
+                            </div>
+                            <?php endforeach; ?>
+                        </div>
+                    </div>
+                    
+                    <!-- Benchmark Fee Ranges -->
+                    <div class="sapgs-chart-container" style="position: relative;">
+                        <div class="sapgs-premium-overlay" style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(2px); z-index: 10; display: flex; align-items: center; justify-content: center; border-radius: 12px;">
+                            <div style="text-align: center; padding: 20px;">
+                                <span class="dashicons dashicons-lock" style="font-size: 32px; color: var(--sapgs-primary); margin-bottom: 10px;"></span>
+                                <p style="font-weight: 600; color: var(--sapgs-text); margin: 10px 0;"><?php echo esc_html__('Premium Feature', 'sapgs'); ?></p>
+                                <p style="color: var(--sapgs-text-light); font-size: 13px;"><?php echo esc_html__('Unlock real-time analytics', 'sapgs'); ?></p>
+                            </div>
+                        </div>
+                        <h4><?php echo esc_html__('Typical Fee Ranges (Nationwide Benchmark)', 'sapgs'); ?></h4>
+                        <div class="sapgs-benchmark-list" style="margin-top: 20px;">
+                            <?php foreach ($benchmarks['fee_ranges'] as $gateway_id => $data): 
+                                $gateway = $gateway_manager->get_gateway($gateway_id);
+                                if (!$gateway) continue;
+                            ?>
+                            <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px; border-bottom: 1px solid var(--sapgs-border);">
+                                <div>
+                                    <strong><?php echo esc_html($gateway->get_name()); ?></strong>
+                                    <p style="margin: 4px 0 0 0; font-size: 12px; color: var(--sapgs-text-light);"><?php echo esc_html($data['description']); ?></p>
+                                </div>
+                                <div style="text-align: right;">
+                                    <strong style="font-size: 14px; color: var(--sapgs-primary);"><?php echo esc_html($data['percentage']); ?></strong>
+                                    <p style="margin: 4px 0 0 0; font-size: 11px; color: var(--sapgs-text-light);">+ <?php echo esc_html($data['fixed']); ?> fixed</p>
+                                </div>
+                            </div>
+                            <?php endforeach; ?>
+                        </div>
                     </div>
                 </div>
                 <?php endif; ?>
@@ -535,10 +812,13 @@ class SAPGS_Dashboard {
                                 <h4 style="margin-top: 0; color: var(--sapgs-text);">Free Plan</h4>
                                 <div style="font-size: 32px; font-weight: 700; margin: 16px 0; background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">R0<span style="font-size: 18px; font-weight: 400;">/month</span></div>
                                 <ul style="list-style: none; padding: 0; margin: 20px 0;">
-                                    <li style="padding: 8px 0; border-bottom: 1px solid var(--sapgs-border);">✓ Up to 2 payment gateways</li>
+                                    <li style="padding: 8px 0; border-bottom: 1px solid var(--sapgs-border);">✓ 1 active gateway (can switch)</li>
                                     <li style="padding: 8px 0; border-bottom: 1px solid var(--sapgs-border);">✓ Last 20 transaction logs</li>
                                     <li style="padding: 8px 0; border-bottom: 1px solid var(--sapgs-border);">✓ Basic gateway testing</li>
                                     <li style="padding: 8px 0; border-bottom: 1px solid var(--sapgs-border);">✓ Gateway configuration</li>
+                                    <li style="padding: 8px 0; border-bottom: 1px solid var(--sapgs-border);">✓ Benchmark preview</li>
+                                    <li style="padding: 8px 0; border-bottom: 1px solid var(--sapgs-border);">✓ Basic uptime status</li>
+                                    <li style="padding: 8px 0; border-bottom: 1px solid var(--sapgs-border);">✓ Manual fee calculator</li>
                                 </ul>
                             </div>
                             
@@ -583,6 +863,16 @@ class SAPGS_Dashboard {
                 <div id="settings" class="sapgs-tab-content">
                     <h2><?php echo esc_html__('Settings', 'sapgs'); ?></h2>
                     
+                    <!-- Before Going Live Checklist (Free) -->
+                    <div class="sapgs-live-checklist" style="margin-bottom: 30px; padding: 20px; background: var(--sapgs-card-bg); border-radius: 12px; border: 1px solid var(--sapgs-border);">
+                        <h3 style="margin-top: 0;"><?php echo esc_html__('Before Going Live Checklist', 'sapgs'); ?></h3>
+                        <p style="color: var(--sapgs-text-light);"><?php echo esc_html__('Verify your store is ready for production payments', 'sapgs'); ?></p>
+                        <button class="button button-primary" id="sapgs-run-live-checklist" style="margin-top: 15px;">
+                            <?php echo esc_html__('Run Checklist', 'sapgs'); ?>
+                        </button>
+                        <div id="sapgs-live-checklist-results" style="margin-top: 20px;"></div>
+                    </div>
+                    
                     <?php if ($license_info['is_premium']): ?>
                     <div class="sapgs-optimization-suggestions" style="margin-bottom: 30px; padding: 20px; background: var(--sapgs-card-bg); border-radius: 12px; border: 1px solid var(--sapgs-border);">
                         <h3><?php echo esc_html__('Optimization Suggestions', 'sapgs'); ?></h3>
@@ -591,6 +881,154 @@ class SAPGS_Dashboard {
                             <?php echo esc_html__('Load Suggestions', 'sapgs'); ?>
                         </button>
                         <div id="sapgs-suggestions-container" style="margin-top: 20px;"></div>
+                    </div>
+                    <?php endif; ?>
+                    
+                    <!-- Routing Preview for Free Users -->
+                    <?php if (!$license_info['is_premium']): ?>
+                    <div class="sapgs-routing-preview" style="margin-bottom: 30px; padding: 20px; background: linear-gradient(135deg, rgba(102, 126, 234, 0.05) 0%, rgba(118, 75, 162, 0.05) 100%); border: 2px dashed var(--sapgs-border); border-radius: 12px;">
+                        <h3 style="margin-top: 0;"><?php echo esc_html__('Routing Modes (Premium Feature)', 'sapgs'); ?></h3>
+                        <p><?php echo esc_html__('Upgrade to Premium to unlock intelligent routing modes:', 'sapgs'); ?></p>
+                        <div style="margin-top: 20px;">
+                            <div style="padding: 16px; background: white; border-radius: 8px; margin-bottom: 12px; border-left: 4px solid var(--sapgs-primary);">
+                                <strong><?php echo esc_html__('Default (Primary + Failover)', 'sapgs'); ?></strong>
+                                <p style="margin: 8px 0 0 0; color: var(--sapgs-text-light); font-size: 14px;"><?php echo esc_html__('Uses your default gateway first. If it fails, automatically tries backup gateways in order. Ensures payments continue even if one gateway is down.', 'sapgs'); ?></p>
+                            </div>
+                            <div style="padding: 16px; background: white; border-radius: 8px; margin-bottom: 12px; border-left: 4px solid var(--sapgs-primary);">
+                                <strong><?php echo esc_html__('Highest Approval Rate', 'sapgs'); ?></strong>
+                                <p style="margin: 8px 0 0 0; color: var(--sapgs-text-light); font-size: 14px;"><?php echo esc_html__('Automatically routes payments to the gateway with the highest success rate based on your store\'s historical data. Maximizes successful transactions.', 'sapgs'); ?></p>
+                            </div>
+                            <div style="padding: 16px; background: white; border-radius: 8px; border-left: 4px solid var(--sapgs-primary);">
+                                <strong><?php echo esc_html__('Load Balancing', 'sapgs'); ?></strong>
+                                <p style="margin: 8px 0 0 0; color: var(--sapgs-text-light); font-size: 14px;"><?php echo esc_html__('Distributes payments evenly across all enabled gateways. Prevents overloading a single gateway and provides redundancy.', 'sapgs'); ?></p>
+                            </div>
+                        </div>
+                        <a href="#premium" class="button button-primary sapgs-tab-link" data-tab="premium" style="margin-top: 20px;"><?php echo esc_html__('Upgrade to Premium', 'sapgs'); ?></a>
+                    </div>
+                    <?php endif; ?>
+                    
+                    <!-- Manual Fee Calculator for Free Users -->
+                    <?php if (!$license_info['is_premium']): ?>
+                    <div class="sapgs-fee-calculator" style="margin-bottom: 30px; padding: 20px; background: var(--sapgs-card-bg); border-radius: 12px; border: 1px solid var(--sapgs-border);">
+                        <h3 style="margin-top: 0;"><?php echo esc_html__('Fee Calculator', 'sapgs'); ?></h3>
+                        <p style="color: var(--sapgs-text-light);"><?php echo esc_html__('Manually calculate and compare fees across gateways. Premium users get automatic fee tracking and historical data.', 'sapgs'); ?></p>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 20px;">
+                            <div>
+                                <label style="display: block; margin-bottom: 8px; font-weight: 600;"><?php echo esc_html__('Transaction Amount (R)', 'sapgs'); ?></label>
+                                <input type="number" id="sapgs-calc-amount" value="100" step="0.01" min="0" style="width: 100%; padding: 10px; border: 1px solid var(--sapgs-border); border-radius: 8px;">
+                            </div>
+                            <div>
+                                <label style="display: block; margin-bottom: 8px; font-weight: 600;"><?php echo esc_html__('Select Gateway', 'sapgs'); ?></label>
+                                <select id="sapgs-calc-gateway" style="width: 100%; padding: 10px; border: 1px solid var(--sapgs-border); border-radius: 8px;">
+                                    <?php foreach ($all_gateways as $gateway_id => $gateway): ?>
+                                    <option value="<?php echo esc_attr($gateway_id); ?>"><?php echo esc_html($gateway->get_name()); ?></option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </div>
+                        </div>
+                        <div style="margin-top: 20px;">
+                            <button type="button" class="button button-primary" id="sapgs-calculate-fee"><?php echo esc_html__('Calculate Fee', 'sapgs'); ?></button>
+                            <div id="sapgs-fee-result" style="margin-top: 20px; padding: 16px; background: var(--sapgs-bg); border-radius: 8px; display: none;">
+                                <strong><?php echo esc_html__('Fee Breakdown:', 'sapgs'); ?></strong>
+                                <div id="sapgs-fee-breakdown" style="margin-top: 10px;"></div>
+                            </div>
+                        </div>
+                    </div>
+                    <?php endif; ?>
+                    
+                    <!-- Setup Audit Checklist for Free Users -->
+                    <div class="sapgs-setup-audit" style="margin-bottom: 30px; padding: 20px; background: var(--sapgs-card-bg); border-radius: 12px; border: 1px solid var(--sapgs-border);">
+                        <h3 style="margin-top: 0;"><?php echo esc_html__('Setup Audit Checklist', 'sapgs'); ?></h3>
+                        <p style="color: var(--sapgs-text-light);"><?php echo esc_html__('Verify your store is properly configured for payment processing:', 'sapgs'); ?></p>
+                        <div style="margin-top: 20px;">
+                            <?php
+                            $ssl_active = is_ssl();
+                            $woocommerce_active = class_exists('WooCommerce');
+                            $currency_zar = false;
+                            $current_currency = 'N/A';
+                            if ($woocommerce_active && function_exists('get_woocommerce_currency')) {
+                                $current_currency = get_woocommerce_currency();
+                                $currency_zar = $current_currency === 'ZAR';
+                            }
+                            ?>
+                            <div style="display: flex; align-items: center; padding: 12px; border-bottom: 1px solid var(--sapgs-border);">
+                                <span class="dashicons <?php echo $ssl_active ? 'dashicons-yes-alt' : 'dashicons-dismiss'; ?>" style="color: <?php echo $ssl_active ? '#10b981' : '#ef4444'; ?>; margin-right: 12px; font-size: 20px;"></span>
+                                <div style="flex: 1;">
+                                    <strong><?php echo esc_html__('SSL Certificate Active', 'sapgs'); ?></strong>
+                                    <p style="margin: 4px 0 0 0; font-size: 13px; color: var(--sapgs-text-light);"><?php echo $ssl_active ? esc_html__('Your site is using HTTPS', 'sapgs') : esc_html__('SSL is required for payment processing', 'sapgs'); ?></p>
+                                </div>
+                            </div>
+                            <div style="display: flex; align-items: center; padding: 12px; border-bottom: 1px solid var(--sapgs-border);">
+                                <span class="dashicons <?php echo $woocommerce_active ? 'dashicons-yes-alt' : 'dashicons-dismiss'; ?>" style="color: <?php echo $woocommerce_active ? '#10b981' : '#ef4444'; ?>; margin-right: 12px; font-size: 20px;"></span>
+                                <div style="flex: 1;">
+                                    <strong><?php echo esc_html__('WooCommerce Active', 'sapgs'); ?></strong>
+                                    <p style="margin: 4px 0 0 0; font-size: 13px; color: var(--sapgs-text-light);"><?php echo $woocommerce_active ? esc_html__('WooCommerce is installed and active', 'sapgs') : esc_html__('WooCommerce is required', 'sapgs'); ?></p>
+                                </div>
+                            </div>
+                            <div style="display: flex; align-items: center; padding: 12px; border-bottom: 1px solid var(--sapgs-border);">
+                                <span class="dashicons <?php echo $currency_zar ? 'dashicons-yes-alt' : 'dashicons-warning'; ?>" style="color: <?php echo $currency_zar ? '#10b981' : '#f59e0b'; ?>; margin-right: 12px; font-size: 20px;"></span>
+                                <div style="flex: 1;">
+                                    <strong><?php echo esc_html__('Currency: ZAR', 'sapgs'); ?></strong>
+                                    <p style="margin: 4px 0 0 0; font-size: 13px; color: var(--sapgs-text-light);"><?php echo $currency_zar ? esc_html__('Store currency is set to ZAR', 'sapgs') : sprintf(esc_html__('Current currency: %s (ZAR recommended)', 'sapgs'), $current_currency); ?></p>
+                                </div>
+                            </div>
+                            <div style="display: flex; align-items: center; padding: 12px;">
+                                <span class="dashicons dashicons-info" style="color: var(--sapgs-primary); margin-right: 12px; font-size: 20px;"></span>
+                                <div style="flex: 1;">
+                                    <strong><?php echo esc_html__('Webhooks Configured', 'sapgs'); ?></strong>
+                                    <p style="margin: 4px 0 0 0; font-size: 13px; color: var(--sapgs-text-light);"><?php echo esc_html__('Configure webhooks in your gateway dashboard for payment notifications', 'sapgs'); ?></p>
+                                </div>
+                            </div>
+                        </div>
+                        <?php if (!$license_info['is_premium']): ?>
+                        <p style="margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--sapgs-border); color: var(--sapgs-text-light); font-size: 13px;">
+                            <?php echo esc_html__('Premium users get deeper diagnostics, recommendations, and automated webhook configuration.', 'sapgs'); ?>
+                        </p>
+                        <?php endif; ?>
+                    </div>
+                    
+                    <!-- Basic Uptime Status for Free Users -->
+                    <?php if (!$license_info['is_premium']): ?>
+                    <div class="sapgs-uptime-status" style="margin-bottom: 30px; padding: 20px; background: var(--sapgs-card-bg); border-radius: 12px; border: 1px solid var(--sapgs-border);">
+                        <h3 style="margin-top: 0;"><?php echo esc_html__('Current Gateway Status', 'sapgs'); ?></h3>
+                        <p style="color: var(--sapgs-text-light);"><?php echo esc_html__('Live status of your enabled gateway. Premium users get historical uptime data, downtime patterns, and alerts.', 'sapgs'); ?></p>
+                        <div id="sapgs-uptime-status-list" style="margin-top: 20px;">
+                            <?php 
+                            $enabled_gateways = $gateway_manager->get_enabled_gateways();
+                            if (empty($enabled_gateways)): 
+                            ?>
+                            <p style="color: var(--sapgs-text-light);"><?php echo esc_html__('No gateways enabled. Enable a gateway to see status.', 'sapgs'); ?></p>
+                            <?php else: 
+                                foreach ($enabled_gateways as $gateway_id => $gateway):
+                                    $test_result = $gateway->test_connection();
+                                    $is_up = $test_result['success'] ?? false;
+                            ?>
+                            <div style="display: flex; align-items: center; padding: 12px; border-bottom: 1px solid var(--sapgs-border);">
+                                <span class="sapgs-status-indicator status-<?php echo $is_up ? 'connected' : 'offline'; ?>" style="margin-right: 12px;"></span>
+                                <div style="flex: 1;">
+                                    <strong><?php echo esc_html($gateway->get_name()); ?></strong>
+                                    <p style="margin: 4px 0 0 0; font-size: 13px; color: var(--sapgs-text-light);">
+                                        <?php echo $is_up ? esc_html__('Online - Gateway is responding', 'sapgs') : esc_html__('Offline - Gateway is not responding', 'sapgs'); ?>
+                                    </p>
+                                </div>
+                            </div>
+                            <?php 
+                                endforeach;
+                            endif; 
+                            ?>
+                        </div>
+                        <button type="button" class="button" id="sapgs-refresh-uptime" style="margin-top: 15px;"><?php echo esc_html__('Refresh Status', 'sapgs'); ?></button>
+                    </div>
+                    
+                    <!-- Simulated Failover Demo for Free Users -->
+                    <div class="sapgs-failover-demo" style="margin-bottom: 30px; padding: 20px; background: linear-gradient(135deg, rgba(102, 126, 234, 0.05) 0%, rgba(118, 75, 162, 0.05) 100%); border: 2px dashed var(--sapgs-border); border-radius: 12px;">
+                        <h3 style="margin-top: 0;"><?php echo esc_html__('Automatic Failover Demo (Simulated)', 'sapgs'); ?></h3>
+                        <p style="color: var(--sapgs-text-light);"><?php echo esc_html__('See how automatic failover works when your primary gateway fails. This is a simulation using sample data. Premium users get real automatic failover with multiple gateways.', 'sapgs'); ?></p>
+                        <button type="button" class="button button-primary" id="sapgs-run-failover-demo" style="margin-top: 15px;"><?php echo esc_html__('Run Failover Demo', 'sapgs'); ?></button>
+                        <div id="sapgs-failover-demo-result" style="margin-top: 20px; display: none; padding: 16px; background: white; border-radius: 8px; border: 1px solid var(--sapgs-border);">
+                            <h4 style="margin-top: 0;"><?php echo esc_html__('Simulated Payment Flow:', 'sapgs'); ?></h4>
+                            <div id="sapgs-failover-demo-steps" style="font-size: 14px; line-height: 2;"></div>
+                        </div>
                     </div>
                     <?php endif; ?>
                     
@@ -607,6 +1045,9 @@ class SAPGS_Dashboard {
                                                <?php checked(get_option('sapgs_failover_enabled', false)); ?>
                                                <?php disabled(!$license_info['is_premium']); ?>>
                                         <?php echo esc_html__('Enable automatic failover to backup gateway', 'sapgs'); ?>
+                                        <?php if (!$license_info['is_premium']): ?>
+                                        <span class="sapgs-premium-badge" style="font-size: 11px; color: var(--sapgs-primary); font-weight: 600; margin-left: 8px;"><?php echo esc_html__('Premium', 'sapgs'); ?></span>
+                                        <?php endif; ?>
                                     </label>
                                 </td>
                             </tr>
@@ -625,8 +1066,7 @@ class SAPGS_Dashboard {
                                             <?php echo esc_html__('Highest Approval Rate', 'sapgs'); ?>
                                         </option>
                                         <option value="load_balance" <?php selected(get_option('sapgs_routing_mode', 'default'), 'load_balance'); ?>>
-                                            <?php echo esc_html__('Load Balancing', 'sapgs'); ?>
-                                        </option>
+                                            <?php echo esc_html__('Load Balancing', 'sapgs'); ?></option>
                                     </select>
                                 </td>
                             </tr>

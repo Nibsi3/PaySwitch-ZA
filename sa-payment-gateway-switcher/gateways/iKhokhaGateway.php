@@ -1,15 +1,15 @@
 <?php
 /**
- * Payfast Gateway
+ * iKhokha Gateway
  */
 
 if (!defined('ABSPATH')) {
     exit;
 }
 
-class SAPGS_PayfastGateway implements SAPGS_GatewayInterface {
+class SAPGS_iKhokhaGateway implements SAPGS_GatewayInterface {
     
-    private $id = 'payfast';
+    private $id = 'ikhokha';
     private $config;
     
     public function get_id() {
@@ -17,11 +17,11 @@ class SAPGS_PayfastGateway implements SAPGS_GatewayInterface {
     }
     
     public function get_name() {
-        return 'Payfast';
+        return 'iKhokha';
     }
     
     public function get_description() {
-        return 'Payfast is one of South Africa\'s leading payment gateways, supporting credit cards, debit cards, and EFT.';
+        return 'iKhokha is a growing South African payment provider offering card payments, EFT, and mobile payment solutions for businesses.';
     }
     
     public function get_config_fields() {
@@ -31,15 +31,15 @@ class SAPGS_PayfastGateway implements SAPGS_GatewayInterface {
                 'type' => 'text',
                 'required' => true
             ),
-            'merchant_key' => array(
-                'label' => 'Merchant Key',
-                'type' => 'text',
+            'api_key' => array(
+                'label' => 'API Key',
+                'type' => 'password',
                 'required' => true
             ),
-            'passphrase' => array(
-                'label' => 'Passphrase',
+            'api_secret' => array(
+                'label' => 'API Secret',
                 'type' => 'password',
-                'required' => false
+                'required' => true
             ),
             'sandbox' => array(
                 'label' => 'Sandbox Mode',
@@ -64,14 +64,7 @@ class SAPGS_PayfastGateway implements SAPGS_GatewayInterface {
     
     public function is_configured() {
         $config = $this->get_config();
-        // Check both test_mode and sandbox for compatibility
-        $test_mode = (isset($config['test_mode']) && $config['test_mode']) || (isset($config['sandbox']) && $config['sandbox']);
-        
-        if ($test_mode) {
-            return !empty($config['test_merchant_id']) && !empty($config['test_merchant_key']);
-        } else {
-            return !empty($config['merchant_id']) && !empty($config['merchant_key']);
-        }
+        return !empty($config['merchant_id']) && !empty($config['api_key']) && !empty($config['api_secret']);
     }
     
     public function connect() {
@@ -83,19 +76,15 @@ class SAPGS_PayfastGateway implements SAPGS_GatewayInterface {
         }
         
         $config = $this->get_config();
-        // Check both test_mode and sandbox for compatibility
-        $test_mode = (isset($config['test_mode']) && $config['test_mode']) || (isset($config['sandbox']) && $config['sandbox']);
-        $api_url = $test_mode ? 'https://sandbox.payfast.co.za' : 'https://www.payfast.co.za';
+        $sandbox = isset($config['sandbox']) && $config['sandbox'];
+        $api_url = $sandbox ? 'https://sandbox.ikhokha.com/api' : 'https://api.ikhokha.com';
         
-        // Use test or live keys based on test mode
-        $merchant_id = $test_mode ? (isset($config['test_merchant_id']) ? $config['test_merchant_id'] : '') : (isset($config['merchant_id']) ? $config['merchant_id'] : '');
-        $merchant_key = $test_mode ? (isset($config['test_merchant_key']) ? $config['test_merchant_key'] : '') : (isset($config['merchant_key']) ? $config['merchant_key'] : '');
-        
-        $response = wp_remote_get($api_url . '/eng/query/validate', array(
+        $response = wp_remote_get($api_url . '/v1/merchant/status', array(
             'timeout' => 10,
             'headers' => array(
-                'merchant-id' => $merchant_id,
-                'merchant-key' => $merchant_key
+                'Authorization' => 'Bearer ' . $config['api_key'],
+                'X-Merchant-ID' => $config['merchant_id'],
+                'Content-Type' => 'application/json'
             )
         ));
         
@@ -123,44 +112,38 @@ class SAPGS_PayfastGateway implements SAPGS_GatewayInterface {
         }
         
         $config = $this->get_config();
-        // Check both test_mode and sandbox for compatibility
-        $test_mode = (isset($config['test_mode']) && $config['test_mode']) || (isset($config['sandbox']) && $config['sandbox']);
-        $api_url = $test_mode ? 'https://sandbox.payfast.co.za' : 'https://www.payfast.co.za';
+        $sandbox = isset($config['sandbox']) && $config['sandbox'];
+        $api_url = $sandbox ? 'https://sandbox.ikhokha.com/api' : 'https://api.ikhokha.com';
         
         $start_time = microtime(true);
         
-        // Use test or live keys based on test mode
-        $merchant_id = $test_mode ? (isset($config['test_merchant_id']) ? $config['test_merchant_id'] : '') : (isset($config['merchant_id']) ? $config['merchant_id'] : '');
-        $merchant_key = $test_mode ? (isset($config['test_merchant_key']) ? $config['test_merchant_key'] : '') : (isset($config['merchant_key']) ? $config['merchant_key'] : '');
-        
         $params = array(
-            'merchant_id' => $merchant_id,
-            'merchant_key' => $merchant_key,
+            'merchant_id' => $config['merchant_id'],
             'amount' => number_format($amount, 2, '.', ''),
-            'item_name' => isset($data['item_name']) ? $data['item_name'] : 'Order #' . ($data['order_id'] ?? ''),
+            'currency' => 'ZAR',
+            'reference' => isset($data['order_id']) ? 'ORDER-' . $data['order_id'] : 'TXN-' . time(),
             'return_url' => isset($data['return_url']) ? $data['return_url'] : home_url(),
             'cancel_url' => isset($data['cancel_url']) ? $data['cancel_url'] : home_url(),
-            'notify_url' => isset($data['notify_url']) ? $data['notify_url'] : home_url('/?sapgs_webhook=payfast')
+            'notify_url' => isset($data['notify_url']) ? $data['notify_url'] : home_url('/?sapgs_webhook=ikhokha'),
+            'customer' => array(
+                'email' => $data['customer_email'] ?? '',
+                'first_name' => $data['customer_first_name'] ?? '',
+                'last_name' => $data['customer_last_name'] ?? ''
+            ),
+            'description' => isset($data['item_name']) ? $data['item_name'] : 'Order #' . ($data['order_id'] ?? '')
         );
         
         // Generate signature
-        if (!empty($config['passphrase'])) {
-            $params['passphrase'] = $config['passphrase'];
-        }
+        $signature_string = $config['merchant_id'] . $params['amount'] . $params['currency'] . $params['reference'] . $config['api_secret'];
+        $params['signature'] = hash('sha256', $signature_string);
         
-        $pfParamString = '';
-        foreach ($params as $key => $val) {
-            if ($val !== '') {
-                $pfParamString .= $key . '=' . urlencode($val) . '&';
-            }
-        }
-        $pfParamString = substr($pfParamString, 0, -1);
-        
-        $signature = md5($pfParamString);
-        $params['signature'] = $signature;
-        
-        $response = wp_remote_post($api_url . '/eng/process', array(
-            'body' => $params,
+        $response = wp_remote_post($api_url . '/v1/payments', array(
+            'body' => json_encode($params),
+            'headers' => array(
+                'Authorization' => 'Bearer ' . $config['api_key'],
+                'X-Merchant-ID' => $config['merchant_id'],
+                'Content-Type' => 'application/json'
+            ),
             'timeout' => 30
         ));
         
@@ -185,27 +168,22 @@ class SAPGS_PayfastGateway implements SAPGS_GatewayInterface {
         
         $body = wp_remote_retrieve_body($response);
         $code = wp_remote_retrieve_response_code($response);
+        $result = json_decode($body, true);
         
         $logger = new SAPGS_Logger();
         $logger->log($this->id, array(
             'status' => $code === 200 ? 'success' : 'failed',
-            'transaction_id' => isset($data['transaction_id']) ? $data['transaction_id'] : null,
-            'order_id' => $data['order_id'] ?? null,
             'amount' => $amount,
             'response_time' => $response_time,
-            'error_message' => $code !== 200 ? 'HTTP ' . $code : null,
             'request_data' => $params,
-            'response_data' => json_decode($body, true)
+            'response_data' => $result
         ));
         
-        if ($code === 200) {
-            // Parse response to get payment URL
-            parse_str($body, $result);
-            
+        if ($code === 200 && isset($result['payment_url'])) {
             return array(
                 'success' => true,
-                'transaction_id' => $result['pf_payment_id'] ?? null,
-                'payment_url' => $api_url . '/eng/process?' . http_build_query($params),
+                'transaction_id' => $result['transaction_id'] ?? $params['reference'],
+                'payment_url' => $result['payment_url'],
                 'message' => 'Payment initiated',
                 'response_time' => $response_time
             );
@@ -213,7 +191,7 @@ class SAPGS_PayfastGateway implements SAPGS_GatewayInterface {
         
         return array(
             'success' => false,
-            'message' => 'Payment failed: ' . $body,
+            'message' => 'Payment failed: ' . ($result['message'] ?? $result['error'] ?? 'Unknown error'),
             'response_time' => $response_time
         );
     }
@@ -227,26 +205,29 @@ class SAPGS_PayfastGateway implements SAPGS_GatewayInterface {
         }
         
         $config = $this->get_config();
-        // Check both test_mode and sandbox for compatibility
-        $test_mode = (isset($config['test_mode']) && $config['test_mode']) || (isset($config['sandbox']) && $config['sandbox']);
-        $api_url = $test_mode ? 'https://sandbox.payfast.co.za' : 'https://www.payfast.co.za';
-        
-        // Use test or live keys based on test mode
-        $merchant_id = $test_mode ? (isset($config['test_merchant_id']) ? $config['test_merchant_id'] : '') : (isset($config['merchant_id']) ? $config['merchant_id'] : '');
-        $merchant_key = $test_mode ? (isset($config['test_merchant_key']) ? $config['test_merchant_key'] : '') : (isset($config['merchant_key']) ? $config['merchant_key'] : '');
+        $sandbox = isset($config['sandbox']) && $config['sandbox'];
+        $api_url = $sandbox ? 'https://sandbox.ikhokha.com/api' : 'https://api.ikhokha.com';
         
         $params = array(
-            'merchant_id' => $merchant_id,
-            'merchant_key' => $merchant_key,
-            'pf_payment_id' => $transaction_id
+            'merchant_id' => $config['merchant_id'],
+            'transaction_id' => $transaction_id
         );
         
         if ($amount !== null) {
             $params['amount'] = number_format($amount, 2, '.', '');
         }
         
-        $response = wp_remote_post($api_url . '/eng/refund', array(
-            'body' => $params,
+        // Generate signature
+        $signature_string = $config['merchant_id'] . $transaction_id . ($amount !== null ? $params['amount'] : '') . $config['api_secret'];
+        $params['signature'] = hash('sha256', $signature_string);
+        
+        $response = wp_remote_post($api_url . '/v1/refunds', array(
+            'body' => json_encode($params),
+            'headers' => array(
+                'Authorization' => 'Bearer ' . $config['api_key'],
+                'X-Merchant-ID' => $config['merchant_id'],
+                'Content-Type' => 'application/json'
+            ),
             'timeout' => 30
         ));
         
@@ -259,10 +240,9 @@ class SAPGS_PayfastGateway implements SAPGS_GatewayInterface {
         
         $body = wp_remote_retrieve_body($response);
         $code = wp_remote_retrieve_response_code($response);
+        $result = json_decode($body, true);
         
-        if ($code === 200) {
-            parse_str($body, $result);
-            
+        if ($code === 200 && isset($result['status']) && $result['status'] === 'success') {
             return array(
                 'success' => true,
                 'refund_id' => $result['refund_id'] ?? $transaction_id,
@@ -272,7 +252,7 @@ class SAPGS_PayfastGateway implements SAPGS_GatewayInterface {
         
         return array(
             'success' => false,
-            'message' => 'Refund failed: ' . $body
+            'message' => 'Refund failed: ' . ($result['message'] ?? $result['error'] ?? 'Unknown error')
         );
     }
     
@@ -287,16 +267,16 @@ class SAPGS_PayfastGateway implements SAPGS_GatewayInterface {
     
     public function get_fees() {
         return array(
-            'percentage' => 2.9,
-            'fixed' => 2.00
+            'percentage' => 2.75,
+            'fixed' => 1.50
         );
     }
     
     public function get_credential_url($test_mode = false) {
         if ($test_mode) {
-            return 'https://sandbox.payfast.co.za/user/login';
+            return 'https://sandbox.ikhokha.com/merchant/login';
         }
-        return 'https://www.payfast.co.za/user/login';
+        return 'https://www.ikhokha.com/merchant/login';
     }
 }
 

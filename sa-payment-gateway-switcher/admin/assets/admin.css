@@ -23,22 +23,27 @@
 }
 
 .sapgs-dashboard {
-    max-width: 1600px;
+    max-width: 100%;
     margin: 0;
-    padding: 0;
+    padding: 0 20px 20px 20px;
     background: var(--sapgs-bg);
     min-height: calc(100vh - 32px);
     position: relative;
+    overflow-x: hidden;
+    width: 100%;
+    box-sizing: border-box;
 }
 
-/* Modern Header */
+/* Modern Header - Full Width Edge-to-Edge */
 .sapgs-dashboard > h1 {
     background: linear-gradient(135deg, #667eea 0%, #764ba2 25%, #f093fb 50%, #4facfe 75%, #00f2fe 100%);
     background-size: 200% 200%;
     animation: gradientShift 8s ease infinite;
     color: white;
     padding: 30px 40px;
-    margin: -20px -20px 30px -20px;
+    margin: 0 -20px 30px -20px;
+    width: calc(100% + 40px);
+    max-width: calc(100% + 40px);
     border-radius: 0;
     font-size: 28px;
     font-weight: 700;
@@ -50,6 +55,7 @@
     z-index: 1;
     backdrop-filter: blur(10px);
     -webkit-backdrop-filter: blur(10px);
+    box-sizing: border-box;
 }
 
 @keyframes gradientShift {
@@ -95,6 +101,11 @@
     margin-bottom: 30px;
     position: relative;
     z-index: 1;
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+    overflow-x: auto;
+    overflow-y: hidden;
 }
 
 .sapgs-tab-nav {
@@ -103,6 +114,8 @@
     border-bottom: none;
     margin-bottom: 0;
     flex-wrap: wrap;
+    width: 100%;
+    box-sizing: border-box;
 }
 
 .sapgs-tab-nav a {
@@ -171,6 +184,9 @@
     padding-top: 0;
     position: relative;
     z-index: 1;
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
 }
 
 .sapgs-gateway-card {
@@ -181,12 +197,18 @@
 .sapgs-gateway-card {
     border: 1px solid var(--sapgs-border);
     border-radius: 16px;
-    padding: 28px;
+    padding: 20px;
     background: var(--sapgs-card-bg);
     box-shadow: var(--sapgs-shadow);
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     position: relative;
-    overflow: hidden;
+    overflow: visible;
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    gap: 0;
 }
 
 .sapgs-gateway-card:hover {
@@ -204,15 +226,20 @@
     display: flex;
     justify-content: space-between;
     align-items: flex-start;
-    margin-bottom: 20px;
-    margin-top: 8px;
+    margin-bottom: 12px;
+    margin-top: 0;
     position: relative;
+    gap: 12px;
+    flex-shrink: 0;
 }
 
 .sapgs-gateway-header-right {
     display: flex;
     align-items: center;
     gap: 8px;
+    flex-shrink: 0;
+    position: relative;
+    z-index: 10;
 }
 
 .sapgs-gateway-title-wrapper {
@@ -220,6 +247,7 @@
     align-items: center;
     gap: 12px;
     flex: 1;
+    min-width: 0;
 }
 
 .sapgs-gateway-logo {
@@ -235,27 +263,32 @@
 
 .sapgs-gateway-header h3 {
     margin: 0;
-    font-size: 20px;
+    font-size: 18px;
     font-weight: 700;
     color: var(--sapgs-text);
     letter-spacing: -0.5px;
+    line-height: 1.3;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
 }
 
 .sapgs-gateway-desc {
     color: var(--sapgs-text-light);
     font-size: 14px;
-    line-height: 1.6;
-    margin: 12px 0 20px 0;
+    line-height: 1.5;
+    margin: 0 0 16px 0;
+    flex-shrink: 0;
 }
 
 .sapgs-gateway-actions {
     display: flex;
     flex-wrap: wrap;
-    gap: 12px;
-    margin-top: 20px;
+    gap: 8px;
+    margin-top: auto;
     align-items: center;
-    padding-top: 20px;
+    padding-top: 16px;
     border-top: 1px solid var(--sapgs-border);
+    flex-shrink: 0;
 }
 
 /* Status Indicator - Enhanced */
@@ -1145,50 +1178,68 @@
     transform: scale(1.1);
 }
 
-.sapgs-gateway-info-icon::after {
-    content: attr(data-tooltip);
-    position: absolute;
-    bottom: calc(100% + 12px);
-    right: 0;
-    background: var(--sapgs-text);
-    color: white;
-    padding: 12px 16px;
-    border-radius: 8px;
-    font-size: 12px;
-    line-height: 1.6;
-    white-space: pre-line;
-    opacity: 0;
-    pointer-events: none;
-    transition: opacity 0.2s ease, transform 0.2s ease;
-    z-index: 100005;
-    max-width: 320px;
-    min-width: 240px;
-    box-shadow: var(--sapgs-shadow-xl);
-    text-align: left;
-    font-weight: normal;
-    font-style: normal;
+/* Tooltip content - positioned via JavaScript */
+.sapgs-tooltip-content {
+    display: block;
+    word-wrap: break-word;
 }
 
-.sapgs-gateway-info-icon::before {
-    content: '';
-    position: absolute;
-    bottom: calc(100% + 6px);
-    right: 8px;
-    border: 6px solid transparent;
-    border-top-color: var(--sapgs-text);
-    opacity: 0;
-    pointer-events: none;
-    transition: opacity 0.2s ease;
-    z-index: 100006;
+/* Prevent horizontal scrolling */
+body {
+    overflow-x: hidden !important;
+    max-width: 100vw;
 }
 
-.sapgs-gateway-info-icon:hover::after {
-    opacity: 1;
-    transform: translateY(-4px);
+.wrap.sapgs-dashboard {
+    max-width: 100%;
+    overflow-x: hidden;
+    margin: 0;
+    padding: 0 20px 20px 20px;
 }
 
-.sapgs-gateway-info-icon:hover::before {
-    opacity: 1;
+.wrap {
+    max-width: 100%;
+    overflow-x: hidden;
+}
+
+/* Make header extend to full width edge-to-edge within wpcontent */
+#wpcontent .wrap.sapgs-dashboard > h1 {
+    margin-left: calc(-1 * var(--wp-content-padding, 20px));
+    margin-right: calc(-1 * var(--wp-content-padding, 20px));
+    width: calc(100% + var(--wp-content-padding, 20px) * 2);
+    max-width: calc(100% + var(--wp-content-padding, 20px) * 2);
+    padding-left: calc(var(--wp-content-padding, 20px) + 40px);
+    padding-right: calc(var(--wp-content-padding, 20px) + 40px);
+    position: relative;
+}
+
+/* Fallback for WordPress versions without CSS variables */
+#wpcontent {
+    padding-left: 20px;
+    padding-right: 20px;
+}
+
+#wpcontent .wrap.sapgs-dashboard > h1 {
+    margin-left: -20px;
+    margin-right: -20px;
+    width: calc(100% + 40px);
+    max-width: calc(100% + 40px);
+    padding-left: 60px;
+    padding-right: 60px;
+}
+
+/* Hide LSCWP error messages and notices above dashboard */
+.wrap.sapgs-dashboard ~ .notice,
+.wrap.sapgs-dashboard ~ .error,
+.wrap.sapgs-dashboard ~ .updated,
+#wpbody-content > .notice:first-child,
+#wpbody-content > .error:first-child {
+    display: none !important;
+    visibility: hidden !important;
+    height: 0 !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    overflow: hidden !important;
 }
 
 /* Smooth Transitions */

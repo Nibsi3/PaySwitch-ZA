@@ -5,7 +5,24 @@
 (function($) {
     'use strict';
     
+    // Ensure jQuery is available - use window.jQuery as fallback
+    if (typeof $ === 'undefined') {
+        if (typeof jQuery !== 'undefined') {
+            $ = jQuery;
+        } else if (typeof window.jQuery !== 'undefined') {
+            $ = window.jQuery;
+        } else {
+            // jQuery not available, but don't break - just log and continue
+            console.warn('jQuery may not be fully loaded');
+            // Try to use window.$ as last resort
+            if (typeof window.$ !== 'undefined') {
+                $ = window.$;
+            }
+        }
+    }
+    
     $(document).ready(function() {
+        try {
         
         // Tab switching with smooth transitions
         $('.sapgs-tab-link').on('click', function(e) {
@@ -99,7 +116,7 @@
                         // Update premium badge visibility
                         var enabledCount = response.data?.enabled_count || 0;
                         var isPremium = response.data?.is_premium || false;
-                        var maxFree = response.data?.max_free || 2;
+                        var maxFree = response.data?.max_free || 1;
                         
                         var $premiumBadge = $card.find('.sapgs-premium-badge');
                         if (!isPremium && !enabled && enabledCount >= maxFree) {
@@ -255,6 +272,50 @@
                         $card.find('.sapgs-test-response-time').text(data.response_time + 'ms');
                         $card.find('.sapgs-test-health-score').text(data.health_score + '/100');
                         $card.find('.sapgs-test-message').text(data.message || '');
+                        
+                        // Performance Badge
+                        var $badgeContainer = $card.find('.sapgs-performance-badge');
+                        var $badgeText = $card.find('.sapgs-badge-text');
+                        if ($badgeContainer.length && $badgeText.length) {
+                            var badgeType = 'pass';
+                            var badgeText = 'Pass';
+                            var badgeColor = '#10B981';
+                            
+                            if (!data.success) {
+                                badgeType = 'fail';
+                                badgeText = 'Fail';
+                                badgeColor = '#EF4444';
+                            } else if (data.health_score < 70 || data.response_time > 1000) {
+                                badgeType = 'warning';
+                                badgeText = 'Warning';
+                                badgeColor = '#F59E0B';
+                            }
+                            
+                            $badgeText.text(badgeText)
+                                .css({
+                                    'background-color': badgeColor,
+                                    'color': 'white'
+                                });
+                            $badgeContainer.show();
+                        }
+                        
+                        // Test Receipt for Free Users
+                        var $receipt = $card.find('.sapgs-test-receipt');
+                        var $receiptContent = $card.find('.sapgs-receipt-content');
+                        if ($receipt.length && $receiptContent.length && !sapgsData.isPremium) {
+                            var receiptHtml = '<div style="font-size: 13px; line-height: 1.8;">';
+                            receiptHtml += '<div><strong>Gateway:</strong> ' + gatewayId + '</div>';
+                            receiptHtml += '<div><strong>Test Date:</strong> ' + new Date().toLocaleString() + '</div>';
+                            receiptHtml += '<div><strong>Status:</strong> <span style="color: ' + statusColor + ';">' + statusText + '</span></div>';
+                            receiptHtml += '<div><strong>Response Time:</strong> ' + data.response_time + 'ms</div>';
+                            receiptHtml += '<div><strong>Health Score:</strong> ' + data.health_score + '/100</div>';
+                            if (data.message) {
+                                receiptHtml += '<div><strong>Message:</strong> ' + data.message + '</div>';
+                            }
+                            receiptHtml += '</div>';
+                            $receiptContent.html(receiptHtml);
+                            $receipt.show();
+                        }
                         
                         // Animate result appearance
                         $result.slideDown(300);
@@ -1369,6 +1430,14 @@
             });
         });
         
+        // Disable sorting for free users
+        if (!sapgsData.isPremium) {
+            $('#sapgs-sort-by').on('change', function() {
+                showNotification('Gateway sorting is a Premium feature. Upgrade to unlock this feature.', 'error');
+                $(this).val('manual'); // Reset to manual
+            });
+        }
+        
         // Gateway Sorting (Premium Only) - No drag and drop
         if (sapgsData.isPremium) {
             var sortingData = null;
@@ -1507,6 +1576,498 @@
             }
         }
         
+        // Fee Calculator (Free Users)
+        $('#sapgs-calculate-fee').on('click', function() {
+            var amount = parseFloat($('#sapgs-calc-amount').val()) || 0;
+            var gatewayId = $('#sapgs-calc-gateway').val();
+            
+            if (amount <= 0) {
+                showNotification('Please enter a valid amount', 'error');
+                return;
+            }
+            
+            // Get gateway fees (this would normally come from API, but for free users we use static data)
+            var gatewayFees = {
+                'payfast': { percentage: 2.9, fixed: 2.00 },
+                'ozow': { percentage: 2.75, fixed: 1.50 },
+                'yoco': { percentage: 2.95, fixed: 0.00 },
+                'peach_payments': { percentage: 2.75, fixed: 0.00 },
+                'paygate': { percentage: 3.0, fixed: 2.00 },
+                'paystack_za': { percentage: 2.9, fixed: 2.00 },
+                'snapscan': { percentage: 2.75, fixed: 0.00 },
+                'zapper': { percentage: 2.5, fixed: 0.00 },
+                'stitch': { percentage: 2.5, fixed: 0.00 }
+            };
+            
+            var fees = gatewayFees[gatewayId] || { percentage: 0, fixed: 0 };
+            var percentageFee = (amount * fees.percentage) / 100;
+            var totalFee = percentageFee + fees.fixed;
+            var netAmount = amount - totalFee;
+            
+            var html = '<div style="font-size: 14px; line-height: 2;">';
+            html += '<div><strong>Transaction Amount:</strong> R' + amount.toFixed(2) + '</div>';
+            html += '<div><strong>Percentage Fee (' + fees.percentage + '%):</strong> R' + percentageFee.toFixed(2) + '</div>';
+            html += '<div><strong>Fixed Fee:</strong> R' + fees.fixed.toFixed(2) + '</div>';
+            html += '<div style="border-top: 2px solid var(--sapgs-border); padding-top: 8px; margin-top: 8px;"><strong>Total Fee:</strong> R' + totalFee.toFixed(2) + '</div>';
+            html += '<div style="color: var(--sapgs-primary); font-weight: 600; margin-top: 8px;"><strong>Net Amount (after fees):</strong> R' + netAmount.toFixed(2) + '</div>';
+            html += '</div>';
+            
+            $('#sapgs-fee-breakdown').html(html);
+            $('#sapgs-fee-result').slideDown(300);
+        });
+        
+        // Simulated Failover Demo (Free Users)
+        $('#sapgs-run-failover-demo').on('click', function() {
+            var $button = $(this);
+            var $result = $('#sapgs-failover-demo-result');
+            var $steps = $('#sapgs-failover-demo-steps');
+            
+            $button.prop('disabled', true).text('Running Demo...');
+            $result.hide();
+            $steps.html('');
+            
+            // Simulate failover scenario
+            var steps = [];
+            steps.push('<div style="padding: 8px; background: #FEF3C7; border-left: 4px solid #F59E0B; margin-bottom: 8px; border-radius: 4px;">');
+            steps.push('<strong>Step 1:</strong> Payment request received (R100.00)');
+            steps.push('</div>');
+            
+            setTimeout(function() {
+                steps.push('<div style="padding: 8px; background: #FEF3C7; border-left: 4px solid #F59E0B; margin-bottom: 8px; border-radius: 4px;">');
+                steps.push('<strong>Step 2:</strong> Attempting payment with Primary Gateway (Payfast)...');
+                steps.push('</div>');
+                $steps.html(steps.join(''));
+                
+                setTimeout(function() {
+                    steps.push('<div style="padding: 8px; background: #FEE2E2; border-left: 4px solid #EF4444; margin-bottom: 8px; border-radius: 4px;">');
+                    steps.push('<strong>Step 3:</strong> ❌ Primary Gateway failed (Timeout: 5000ms)');
+                    steps.push('</div>');
+                    $steps.html(steps.join(''));
+                    
+                    setTimeout(function() {
+                        steps.push('<div style="padding: 8px; background: #D1FAE5; border-left: 4px solid #10B981; margin-bottom: 8px; border-radius: 4px;">');
+                        steps.push('<strong>Step 4:</strong> ✅ Automatic failover to Backup Gateway (Ozow)');
+                        steps.push('</div>');
+                        $steps.html(steps.join(''));
+                        
+                        setTimeout(function() {
+                            steps.push('<div style="padding: 8px; background: #D1FAE5; border-left: 4px solid #10B981; margin-bottom: 8px; border-radius: 4px;">');
+                            steps.push('<strong>Step 5:</strong> ✅ Payment successful! Transaction ID: DEMO-' + Date.now());
+                            steps.push('</div>');
+                            steps.push('<div style="margin-top: 12px; padding: 12px; background: #EFF6FF; border-radius: 8px; border: 1px solid #3B82F6;">');
+                            steps.push('<strong>Result:</strong> Payment completed successfully via failover. Without automatic failover, this payment would have failed.');
+                            steps.push('</div>');
+                            $steps.html(steps.join(''));
+                            $result.slideDown(300);
+                            $button.prop('disabled', false).text('Run Failover Demo');
+                        }, 1000);
+                    }, 1000);
+                }, 1500);
+            }, 500);
+        });
+        
+        // Refresh Uptime Status (Free Users)
+        $('#sapgs-refresh-uptime').on('click', function() {
+            var $button = $(this);
+            var $list = $('#sapgs-uptime-status-list');
+            
+            $button.prop('disabled', true).text('Refreshing...');
+            
+            // Test all enabled gateways
+            var enabledGateways = [];
+            $('.sapgs-gateway-card[data-enabled="true"]').each(function() {
+                enabledGateways.push($(this).data('gateway-id'));
+            });
+            
+            if (enabledGateways.length === 0) {
+                $list.html('<p style="color: var(--sapgs-text-light);">No gateways enabled. Enable a gateway to see status.</p>');
+                $button.prop('disabled', false).text('Refresh Status');
+                return;
+            }
+            
+            // Test first gateway (free users only have one)
+            var gatewayId = enabledGateways[0];
+            $.ajax({
+                url: sapgsData.ajaxUrl,
+                type: 'POST',
+                data: {
+                    action: 'sapgs_test_gateway',
+                    gateway_id: gatewayId,
+                    nonce: sapgsData.nonce
+                },
+                success: function(response) {
+                    if (response.success && response.data) {
+                        var data = response.data;
+                        var isUp = data.success;
+                        var gatewayName = $('.sapgs-gateway-card[data-gateway-id="' + gatewayId + '"]').find('h3').text();
+                        
+                        var html = '<div style="display: flex; align-items: center; padding: 12px; border-bottom: 1px solid var(--sapgs-border);">';
+                        html += '<span class="sapgs-status-indicator status-' + (isUp ? 'connected' : 'offline') + '" style="margin-right: 12px;"></span>';
+                        html += '<div style="flex: 1;">';
+                        html += '<strong>' + gatewayName + '</strong>';
+                        html += '<p style="margin: 4px 0 0 0; font-size: 13px; color: var(--sapgs-text-light);">';
+                        html += isUp ? 'Online - Gateway is responding (' + data.response_time + 'ms)' : 'Offline - Gateway is not responding';
+                        html += '</p>';
+                        html += '</div>';
+                        html += '</div>';
+                        
+                        $list.html(html);
+                        showNotification('Status refreshed successfully', 'success');
+                    }
+                },
+                complete: function() {
+                    $button.prop('disabled', false).text('Refresh Status');
+                }
+            });
+        });
+        
+        // Gateway Rankings
+        function loadRankings(useLiveData) {
+            $.ajax({
+                url: sapgsData.ajaxUrl,
+                type: 'POST',
+                data: {
+                    action: 'sapgs_get_gateway_rankings',
+                    use_live_data: useLiveData ? 'true' : 'false',
+                    nonce: sapgsData.nonce
+                },
+                success: function(response) {
+                    if (response.success && response.data) {
+                        renderRankings(response.data.rankings, response.data.use_live_data);
+                    }
+                }
+            });
+        }
+        
+        function renderRankings(rankings, useLiveData) {
+            var html = '<table style="width: 100%; border-collapse: collapse;">';
+            html += '<thead><tr style="background: var(--sapgs-bg); border-bottom: 2px solid var(--sapgs-border);">';
+            html += '<th style="padding: 12px; text-align: left;">Rank</th>';
+            html += '<th style="padding: 12px; text-align: left;">Gateway</th>';
+            html += '<th style="padding: 12px; text-align: right;">Success Rate</th>';
+            html += '<th style="padding: 12px; text-align: right;">Response Time</th>';
+            html += '<th style="padding: 12px; text-align: right;">Uptime</th>';
+            html += '<th style="padding: 12px; text-align: right;">Fees</th>';
+            html += '<th style="padding: 12px; text-align: right;">Score</th>';
+            html += '</tr></thead><tbody>';
+            
+            $.each(rankings, function(gatewayId, data) {
+                var rankClass = data.rank === 1 ? 'background: linear-gradient(135deg, rgba(255, 215, 0, 0.1) 0%, rgba(255, 215, 0, 0.05) 100%);' : '';
+                html += '<tr style="border-bottom: 1px solid var(--sapgs-border); ' + rankClass + '">';
+                html += '<td style="padding: 12px; font-weight: 600; font-size: 18px;">#' + data.rank + '</td>';
+                html += '<td style="padding: 12px; font-weight: 600;">' + data.name + '</td>';
+                html += '<td style="padding: 12px; text-align: right;">' + data.success_rate.toFixed(1) + '%</td>';
+                html += '<td style="padding: 12px; text-align: right;">' + data.response_time + 'ms</td>';
+                html += '<td style="padding: 12px; text-align: right;">' + data.uptime.toFixed(1) + '%</td>';
+                html += '<td style="padding: 12px; text-align: right;">' + data.fee_percentage.toFixed(2) + '%</td>';
+                html += '<td style="padding: 12px; text-align: right; font-weight: 700; color: var(--sapgs-primary);">' + data.weighted_score.toFixed(1) + '</td>';
+                html += '</tr>';
+            });
+            
+            html += '</tbody></table>';
+            html += '<p style="margin-top: 15px; color: var(--sapgs-text-light); font-size: 13px;">';
+            html += useLiveData ? 'Using live store data' : 'Using benchmark data (upgrade to Premium for live data)';
+            html += '</p>';
+            
+            $('#sapgs-rankings-container').html(html);
+        }
+        
+        $('#sapgs-refresh-rankings').on('click', function() {
+            var useLiveData = $('#sapgs-use-live-data').is(':checked');
+            loadRankings(useLiveData);
+        });
+        
+        $('#sapgs-use-live-data').on('change', function() {
+            if ($(this).is(':checked') && !sapgsData.isPremium) {
+                showNotification('Live data rankings require Premium', 'error');
+                $(this).prop('checked', false);
+                return;
+            }
+            loadRankings($(this).is(':checked'));
+        });
+        
+        // Load rankings on tab show
+        $('.sapgs-tab-link[data-tab="rankings"]').on('click', function() {
+            setTimeout(function() {
+                var useLiveData = $('#sapgs-use-live-data').is(':checked') && sapgsData.isPremium;
+                loadRankings(useLiveData);
+            }, 300);
+        });
+        
+        // Failover Report (Premium)
+        if (sapgsData.isPremium) {
+            $('#sapgs-load-failover-report').on('click', function() {
+                var days = $('#sapgs-failover-days').val();
+                var $container = $('#sapgs-failover-report-container');
+                
+                $container.html('<div class="sapgs-loading">Loading report...</div>');
+                
+                $.ajax({
+                    url: sapgsData.ajaxUrl,
+                    type: 'POST',
+                    data: {
+                        action: 'sapgs_get_failover_report',
+                        days: days,
+                        nonce: sapgsData.nonce
+                    },
+                    success: function(response) {
+                        if (response.success && response.data) {
+                            renderFailoverReport(response.data);
+                        } else {
+                            $container.html('<p style="color: var(--sapgs-text-light);">' + (response.data?.message || 'Failed to load report') + '</p>');
+                        }
+                    }
+                });
+            });
+            
+            function renderFailoverReport(data) {
+                var html = '<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; margin-bottom: 30px;">';
+                html += '<div style="background: var(--sapgs-bg); padding: 20px; border-radius: 8px; border: 1px solid var(--sapgs-border);">';
+                html += '<div style="font-size: 32px; font-weight: 700; color: var(--sapgs-primary);">' + data.total + '</div>';
+                html += '<div style="color: var(--sapgs-text-light); margin-top: 8px;">Total Failovers</div>';
+                html += '</div>';
+                html += '<div style="background: var(--sapgs-bg); padding: 20px; border-radius: 8px; border: 1px solid var(--sapgs-border);">';
+                html += '<div style="font-size: 32px; font-weight: 700; color: var(--sapgs-primary);">' + (data.avg_recovery_time || 0) + 'ms</div>';
+                html += '<div style="color: var(--sapgs-text-light); margin-top: 8px;">Avg Recovery Time</div>';
+                html += '</div>';
+                html += '</div>';
+                
+                if (data.by_primary_gateway && data.by_primary_gateway.length > 0) {
+                    html += '<h3>Failovers by Primary Gateway</h3>';
+                    html += '<table style="width: 100%; margin-top: 15px; border-collapse: collapse;">';
+                    html += '<thead><tr style="background: var(--sapgs-bg); border-bottom: 2px solid var(--sapgs-border);">';
+                    html += '<th style="padding: 12px; text-align: left;">Gateway</th>';
+                    html += '<th style="padding: 12px; text-align: right;">Failover Count</th>';
+                    html += '<th style="padding: 12px; text-align: right;">Avg Recovery</th>';
+                    html += '</tr></thead><tbody>';
+                    
+                    $.each(data.by_primary_gateway, function(i, item) {
+                        html += '<tr style="border-bottom: 1px solid var(--sapgs-border);">';
+                        html += '<td style="padding: 12px;">' + item.primary_gateway_id + '</td>';
+                        html += '<td style="padding: 12px; text-align: right;">' + item.count + '</td>';
+                        html += '<td style="padding: 12px; text-align: right;">' + (item.avg_recovery ? Math.round(item.avg_recovery) + 'ms' : 'N/A') + '</td>';
+                        html += '</tr>';
+                    });
+                    
+                    html += '</tbody></table>';
+                }
+                
+                $('#sapgs-failover-report-container').html(html);
+            }
+        }
+        
+        // Webhook Health Checks
+        $('#sapgs-check-all-webhooks').on('click', function() {
+            var $button = $(this);
+            var $results = $('#sapgs-webhook-health-results');
+            
+            $button.prop('disabled', true).text('Checking...');
+            $results.html('<div class="sapgs-loading">Checking webhook health...</div>');
+            
+            // Check each enabled gateway
+            var enabledGateways = [];
+            $('.sapgs-gateway-card[data-enabled="true"]').each(function() {
+                enabledGateways.push($(this).data('gateway-id'));
+            });
+            
+            if (enabledGateways.length === 0) {
+                $results.html('<p style="color: var(--sapgs-text-light);">No gateways enabled</p>');
+                $button.prop('disabled', false).text('Check All Gateways');
+                return;
+            }
+            
+            var checks = [];
+            $.each(enabledGateways, function(i, gatewayId) {
+                $.ajax({
+                    url: sapgsData.ajaxUrl,
+                    type: 'POST',
+                    data: {
+                        action: 'sapgs_check_webhook_health',
+                        gateway_id: gatewayId,
+                        nonce: sapgsData.nonce
+                    },
+                    success: function(response) {
+                        if (response.success) {
+                            checks.push({
+                                gateway_id: gatewayId,
+                                data: response.data
+                            });
+                            
+                            if (checks.length === enabledGateways.length) {
+                                renderWebhookHealth(checks);
+                                $button.prop('disabled', false).text('Check All Gateways');
+                            }
+                        }
+                    }
+                });
+            });
+        });
+        
+        function renderWebhookHealth(checks) {
+            var html = '';
+            $.each(checks, function(i, check) {
+                var status = check.data.is_reachable ? '✓ Reachable' : '✗ Not Reachable';
+                var statusColor = check.data.is_reachable ? '#10B981' : '#EF4444';
+                html += '<div style="padding: 12px; border-bottom: 1px solid var(--sapgs-border);">';
+                html += '<strong>' + check.gateway_id + '</strong><br>';
+                html += '<span style="color: ' + statusColor + ';">' + status + '</span>';
+                if (check.data.response_time) {
+                    html += ' (' + check.data.response_time + 'ms)';
+                }
+                html += '</div>';
+            });
+            $('#sapgs-webhook-health-results').html(html || '<p style="color: var(--sapgs-text-light);">No results</p>');
+        }
+        
+        // Webhook Events Listener
+        $('#sapgs-load-webhook-events').on('click', function() {
+            var $list = $('#sapgs-webhook-events-list');
+            $list.html('<div class="sapgs-loading">Loading events...</div>');
+            
+            $.ajax({
+                url: sapgsData.ajaxUrl,
+                type: 'POST',
+                data: {
+                    action: 'sapgs_get_webhook_events',
+                    limit: 20,
+                    nonce: sapgsData.nonce
+                },
+                success: function(response) {
+                    if (response.success && response.data) {
+                        renderWebhookEvents(response.data);
+                    } else {
+                        $list.html('<p style="color: var(--sapgs-text-light);">No webhook events found</p>');
+                    }
+                }
+            });
+        });
+        
+        function renderWebhookEvents(events) {
+            if (events.length === 0) {
+                $('#sapgs-webhook-events-list').html('<p style="color: var(--sapgs-text-light);">No webhook events received yet</p>');
+                return;
+            }
+            
+            var html = '';
+            $.each(events, function(i, event) {
+                html += '<div style="padding: 12px; border-bottom: 1px solid var(--sapgs-border); background: var(--sapgs-bg); margin-bottom: 8px; border-radius: 8px;">';
+                html += '<div style="display: flex; justify-content: space-between; margin-bottom: 8px;">';
+                html += '<strong>' + event.gateway_id + '</strong>';
+                html += '<span style="color: var(--sapgs-text-light); font-size: 12px;">' + event.received_at + '</span>';
+                html += '</div>';
+                html += '<div style="font-size: 12px; color: var(--sapgs-text-light);">Type: ' + (event.event_type || 'N/A') + '</div>';
+                if (event.signature_valid !== null) {
+                    html += '<div style="font-size: 12px; color: ' + (event.signature_valid ? '#10B981' : '#EF4444') + ';">';
+                    html += 'Signature: ' + (event.signature_valid ? 'Valid' : 'Invalid');
+                    html += '</div>';
+                }
+                html += '</div>';
+            });
+            
+            $('#sapgs-webhook-events-list').html(html);
+        }
+        
+        // Payment Simulation (Premium)
+        if (sapgsData.isPremium) {
+            $('#sapgs-run-simulation').on('click', function() {
+                var gatewayId = $('#sapgs-simulate-gateway').val();
+                var amount = parseFloat($('#sapgs-simulate-amount').val()) || 100.00;
+                var $button = $(this);
+                var $results = $('#sapgs-simulation-results');
+                
+                $button.prop('disabled', true).text('Running...');
+                $results.html('<div class="sapgs-loading">Running simulation...</div>');
+                
+                $.ajax({
+                    url: sapgsData.ajaxUrl,
+                    type: 'POST',
+                    data: {
+                        action: 'sapgs_simulate_checkout',
+                        gateway_id: gatewayId,
+                        amount: amount,
+                        nonce: sapgsData.nonce
+                    },
+                    success: function(response) {
+                        if (response.success && response.data) {
+                            renderSimulationResults(response.data);
+                        } else {
+                            $results.html('<p style="color: #EF4444;">' + (response.data?.message || 'Simulation failed') + '</p>');
+                        }
+                        $button.prop('disabled', false).text('Run Simulation');
+                    }
+                });
+            });
+            
+            function renderSimulationResults(data) {
+                var html = '<div style="background: var(--sapgs-bg); padding: 20px; border-radius: 8px; border: 1px solid var(--sapgs-border);">';
+                html += '<h4 style="margin-top: 0;">Simulation Results for ' + data.gateway_name + '</h4>';
+                
+                if (data.steps) {
+                    $.each(data.steps, function(stepName, step) {
+                        var statusColor = step.success ? '#10B981' : '#EF4444';
+                        html += '<div style="padding: 12px; margin-bottom: 12px; border-left: 4px solid ' + statusColor + '; background: white; border-radius: 4px;">';
+                        html += '<strong>' + step.name + '</strong><br>';
+                        html += '<span style="color: ' + statusColor + ';">' + (step.success ? '✓' : '✗') + ' ' + step.message + '</span><br>';
+                        html += '<span style="color: var(--sapgs-text-light); font-size: 12px;">Response Time: ' + step.response_time + 'ms</span>';
+                        html += '</div>';
+                    });
+                }
+                
+                html += '<div style="margin-top: 20px; padding: 16px; background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%); border-radius: 8px;">';
+                html += '<strong>Total Time to Confirmation: ' + (data.time_to_confirmation || data.total_time || 0) + 'ms</strong>';
+                html += '</div>';
+                html += '</div>';
+                
+                $('#sapgs-simulation-results').html(html);
+            }
+        }
+        
+        // Before Going Live Checklist
+        $('#sapgs-run-live-checklist').on('click', function() {
+            var $button = $(this);
+            var $results = $('#sapgs-live-checklist-results');
+            
+            $button.prop('disabled', true).text('Running...');
+            $results.html('<div class="sapgs-loading">Running checklist...</div>');
+            
+            $.ajax({
+                url: sapgsData.ajaxUrl,
+                type: 'POST',
+                data: {
+                    action: 'sapgs_get_live_checklist',
+                    nonce: sapgsData.nonce
+                },
+                success: function(response) {
+                    if (response.success && response.data) {
+                        renderLiveChecklist(response.data);
+                    }
+                    $button.prop('disabled', false).text('Run Checklist');
+                }
+            });
+        });
+        
+        function renderLiveChecklist(data) {
+            var html = '<div style="margin-top: 20px;">';
+            html += '<div style="padding: 16px; background: ' + (data.all_passed ? 'linear-gradient(135deg, rgba(16, 185, 129, 0.1) 0%, rgba(5, 150, 105, 0.1) 100%);' : 'linear-gradient(135deg, rgba(239, 68, 68, 0.1) 0%, rgba(220, 38, 38, 0.1) 100%);') + ' border-radius: 8px; border: 2px solid ' + (data.all_passed ? '#10B981' : '#EF4444') + '; margin-bottom: 20px;">';
+            html += '<strong style="font-size: 18px;">' + data.passed_count + ' / ' + data.total_count + ' checks passed</strong>';
+            html += '</div>';
+            
+            $.each(data.checklist, function(key, item) {
+                var icon = item.status ? 'dashicons-yes-alt' : 'dashicons-dismiss';
+                var color = item.status ? '#10B981' : '#EF4444';
+                html += '<div style="display: flex; align-items: center; padding: 12px; border-bottom: 1px solid var(--sapgs-border);">';
+                html += '<span class="dashicons ' + icon + '" style="color: ' + color + '; margin-right: 12px; font-size: 20px;"></span>';
+                html += '<div style="flex: 1;">';
+                html += '<strong>' + item.label + '</strong><br>';
+                html += '<span style="color: var(--sapgs-text-light); font-size: 13px;">' + item.message + '</span>';
+                html += '</div>';
+                html += '</div>';
+            });
+            
+            html += '</div>';
+            $('#sapgs-live-checklist-results').html(html);
+        }
+        
         // Settings form submission
         $('#sapgs-settings-form').on('submit', function(e) {
             e.preventDefault();
@@ -1551,7 +2112,209 @@
             });
         });
         
+        // Prevent horizontal scrolling
+        $('body').css('overflow-x', 'hidden');
+        $(window).on('resize', function() {
+            $('body').css('overflow-x', 'hidden');
+        });
         
+        // Hide LSCWP error messages - disabled temporarily to debug blank page issue
+        // Will re-enable once page loads correctly
+        /*
+        function hideLSCWPMessages() {
+            try {
+                // Only target elements that are definitely WordPress admin notices
+                // and are direct children of #wpbody-content
+                $('#wpbody-content > .notice.error, #wpbody-content > .error.notice').each(function() {
+                    try {
+                        var $el = $(this);
+                        if (!$el || $el.length === 0) return;
+                        
+                        var text = $el.text() || '';
+                        // Only hide if it contains LSCWP-related text
+                        if (text.indexOf('LSCWP') !== -1 || 
+                            text.indexOf('object cache initialization') !== -1 ||
+                            text.indexOf('Can NOT find LSCWP') !== -1) {
+                            // Use CSS to hide instead of jQuery hide() for safety
+                            $el.css('display', 'none');
+                        }
+                    } catch(e) {
+                        // Silently fail for individual elements
+                    }
+                });
+            } catch(e) {
+                // Silently fail - don't break the page
+            }
+        }
+        
+        // Only run after DOM is ready with delay to avoid breaking the page
+        setTimeout(function() {
+            try {
+                if (typeof $ !== 'undefined' && $('#wpbody-content').length > 0) {
+                    hideLSCWPMessages();
+                }
+            } catch(e) {
+                // Silently fail
+            }
+        }, 1000);
+        */
+        
+        // Dynamic tooltip positioning for gateway info icons
+        var tooltipTimeout;
+        var currentTooltip = null;
+        var currentIcon = null;
+        var tooltipUpdateHandler = null;
+        
+        function updateTooltipPosition($icon, $tooltip) {
+            if (!$icon || !$tooltip || !$icon.length || !$tooltip.length) {
+                return;
+            }
+            
+            // Get icon position relative to viewport (getBoundingClientRect is viewport-relative)
+            var iconRect = $icon[0].getBoundingClientRect();
+            var iconCenterX = iconRect.left + (iconRect.width / 2);
+            var iconTop = iconRect.top;
+            var iconBottom = iconRect.bottom;
+            
+            // Get tooltip dimensions
+            var tooltipWidth = $tooltip.outerWidth();
+            var tooltipHeight = $tooltip.outerHeight();
+            
+            // Get viewport dimensions
+            var viewportWidth = window.innerWidth || $(window).width();
+            var viewportHeight = window.innerHeight || $(window).height();
+            
+            // Calculate positions (using viewport coordinates for fixed positioning)
+            var top, left;
+            var spacing = 12;
+            
+            // Try to position above icon first
+            top = iconTop - tooltipHeight - spacing;
+            left = iconCenterX - (tooltipWidth / 2);
+            
+            // Check if tooltip fits above (in viewport)
+            var fitsAbove = top >= 10;
+            
+            // If doesn't fit above, try below
+            if (!fitsAbove) {
+                top = iconBottom + spacing;
+                // Check if it fits below
+                var fitsBelow = (top + tooltipHeight) <= (viewportHeight - 10);
+                if (!fitsBelow) {
+                    // Doesn't fit below either, position in viewport center vertically
+                    top = Math.max(10, (viewportHeight / 2) - (tooltipHeight / 2));
+                }
+            }
+            
+            // Adjust horizontal position to stay within viewport
+            if (left < 10) {
+                left = 10;
+            } else if (left + tooltipWidth > viewportWidth - 10) {
+                left = viewportWidth - tooltipWidth - 10;
+            }
+            
+            // Ensure tooltip doesn't go off top of viewport
+            if (top < 10) {
+                top = 10;
+            }
+            
+            // Apply position (using fixed positioning, so no scroll offset needed)
+            $tooltip.css({
+                'top': top + 'px',
+                'left': left + 'px',
+                'visibility': 'visible',
+                'opacity': '1'
+            });
+        }
+        
+        function removeTooltip() {
+            if (currentTooltip) {
+                currentTooltip.stop().fadeOut(150, function() {
+                    $(this).remove();
+                });
+                currentTooltip = null;
+            }
+            if (currentIcon) {
+                currentIcon = null;
+            }
+            if (tooltipUpdateHandler) {
+                $(window).off('scroll resize', tooltipUpdateHandler);
+                tooltipUpdateHandler = null;
+            }
+        }
+        
+        $(document).on('mouseenter', '.sapgs-gateway-info-icon', function(e) {
+            var $icon = $(this);
+            
+            // Clear any existing timeout
+            clearTimeout(tooltipTimeout);
+            
+            // Remove any existing tooltip
+            removeTooltip();
+            
+            var tooltipText = $icon.attr('data-tooltip');
+            if (!tooltipText || tooltipText.trim() === '') {
+                return; // No tooltip text, don't show anything
+            }
+            
+            // Store reference to current icon
+            currentIcon = $icon;
+            
+            // Create tooltip element
+            var $tooltip = $('<div class="sapgs-tooltip-content"></div>')
+                .html(tooltipText.replace(/\n/g, '<br>'))
+                .css({
+                    'position': 'fixed',
+                    'background': '#111827',
+                    'color': 'white',
+                    'padding': '12px 16px',
+                    'border-radius': '8px',
+                    'font-size': '12px',
+                    'line-height': '1.6',
+                    'z-index': '100005',
+                    'max-width': '320px',
+                    'min-width': '240px',
+                    'box-shadow': '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+                    'pointer-events': 'none',
+                    'opacity': '0',
+                    'transition': 'opacity 0.2s ease',
+                    'text-align': 'left',
+                    'font-weight': 'normal',
+                    'font-style': 'normal',
+                    'display': 'block',
+                    'visibility': 'hidden',
+                    'top': '-9999px',
+                    'left': '-9999px'
+                });
+            $('body').append($tooltip);
+            currentTooltip = $tooltip;
+            
+            // Use double requestAnimationFrame to ensure DOM is fully rendered
+            requestAnimationFrame(function() {
+                requestAnimationFrame(function() {
+                    updateTooltipPosition($icon, $tooltip);
+                    
+                    // Set up scroll/resize handler to update position
+                    tooltipUpdateHandler = function() {
+                        if (currentTooltip && currentIcon) {
+                            updateTooltipPosition(currentIcon, currentTooltip);
+                        }
+                    };
+                    
+                    $(window).on('scroll resize', tooltipUpdateHandler);
+                });
+            });
+        });
+        
+        $(document).on('mouseleave', '.sapgs-gateway-info-icon', function() {
+            clearTimeout(tooltipTimeout);
+            removeTooltip();
+        });
+        
+        } catch(e) {
+            // Catch any errors to prevent white screen
+            console.error('Error in PaySwitch ZA admin script:', e);
+        }
     });
     
 })(jQuery);

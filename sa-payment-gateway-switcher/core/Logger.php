@@ -71,16 +71,20 @@ class SAPGS_Logger {
             $limit = min($limit, 20);
         }
         
-        $where = '';
         if ($gateway_id) {
-            $where = $wpdb->prepare("WHERE gateway_id = %s", $gateway_id);
+            $results = $wpdb->get_results($wpdb->prepare(
+                "SELECT * FROM {$this->table_name} WHERE gateway_id = %s ORDER BY created_at DESC LIMIT %d OFFSET %d",
+                $gateway_id,
+                $limit,
+                $offset
+            ), ARRAY_A);
+        } else {
+            $results = $wpdb->get_results($wpdb->prepare(
+                "SELECT * FROM {$this->table_name} ORDER BY created_at DESC LIMIT %d OFFSET %d",
+                $limit,
+                $offset
+            ), ARRAY_A);
         }
-        
-        $results = $wpdb->get_results($wpdb->prepare(
-            "SELECT * FROM {$this->table_name} {$where} ORDER BY created_at DESC LIMIT %d OFFSET %d",
-            $limit,
-            $offset
-        ), ARRAY_A);
         
         // Decode JSON fields
         foreach ($results as &$result) {
@@ -101,9 +105,10 @@ class SAPGS_Logger {
     public function get_stats($gateway_id = null, $days = 7) {
         global $wpdb;
         
-        $where = $wpdb->prepare("WHERE created_at >= DATE_SUB(NOW(), INTERVAL %d DAY)", $days);
         if ($gateway_id) {
-            $where .= $wpdb->prepare(" AND gateway_id = %s", $gateway_id);
+            $where = $wpdb->prepare("WHERE created_at >= DATE_SUB(NOW(), INTERVAL %d DAY) AND gateway_id = %s", $days, $gateway_id);
+        } else {
+            $where = $wpdb->prepare("WHERE created_at >= DATE_SUB(NOW(), INTERVAL %d DAY)", $days);
         }
         
         $stats = array(

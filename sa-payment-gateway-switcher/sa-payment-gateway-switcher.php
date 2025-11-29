@@ -55,7 +55,12 @@ require_once SAPGS_PLUGIN_DIR . 'core/Metrics.php';
 require_once SAPGS_PLUGIN_DIR . 'core/SandboxTester.php';
 require_once SAPGS_PLUGIN_DIR . 'core/OptimizationEngine.php';
 require_once SAPGS_PLUGIN_DIR . 'core/UptimeMonitor.php';
-require_once SAPGS_PLUGIN_DIR . 'core/FeeMonitor.php';
+require_once SAPGS_PLUGIN_DIR . 'core/BenchmarkData.php';
+require_once SAPGS_PLUGIN_DIR . 'core/FailoverTracker.php';
+require_once SAPGS_PLUGIN_DIR . 'core/WebhookHealthChecker.php';
+require_once SAPGS_PLUGIN_DIR . 'core/WebhookListener.php';
+require_once SAPGS_PLUGIN_DIR . 'core/PaymentSimulator.php';
+require_once SAPGS_PLUGIN_DIR . 'core/GatewayRanking.php';
 
 // Load gateway classes
 require_once SAPGS_PLUGIN_DIR . 'gateways/PayfastGateway.php';
@@ -67,6 +72,9 @@ require_once SAPGS_PLUGIN_DIR . 'gateways/PaystackZAGateway.php';
 require_once SAPGS_PLUGIN_DIR . 'gateways/SnapScanGateway.php';
 require_once SAPGS_PLUGIN_DIR . 'gateways/ZapperGateway.php';
 require_once SAPGS_PLUGIN_DIR . 'gateways/StitchGateway.php';
+require_once SAPGS_PLUGIN_DIR . 'gateways/InstantEFTGateway.php';
+require_once SAPGS_PLUGIN_DIR . 'gateways/PayUGateway.php';
+require_once SAPGS_PLUGIN_DIR . 'gateways/iKhokhaGateway.php';
 
 // Load admin
 require_once SAPGS_PLUGIN_DIR . 'admin/settings-page.php';
@@ -119,6 +127,9 @@ class SA_Payment_Gateway_Switcher {
             add_action('admin_init', array($this, 'register_settings'));
         }
         
+        // Webhook handler
+        add_action('init', array($this, 'handle_webhook_request'));
+        
         // AJAX handlers
         add_action('wp_ajax_sapgs_test_gateway', array($this, 'ajax_test_gateway'));
         add_action('wp_ajax_sapgs_toggle_gateway', array($this, 'ajax_toggle_gateway'));
@@ -139,6 +150,12 @@ class SA_Payment_Gateway_Switcher {
         add_action('wp_ajax_sapgs_get_fee_comparison', array($this, 'ajax_get_fee_comparison'));
         add_action('wp_ajax_sapgs_check_fees_now', array($this, 'ajax_check_fees_now'));
         add_action('wp_ajax_sapgs_save_settings', array($this, 'ajax_save_settings'));
+        add_action('wp_ajax_sapgs_get_failover_report', array($this, 'ajax_get_failover_report'));
+        add_action('wp_ajax_sapgs_check_webhook_health', array($this, 'ajax_check_webhook_health'));
+        add_action('wp_ajax_sapgs_simulate_checkout', array($this, 'ajax_simulate_checkout'));
+        add_action('wp_ajax_sapgs_get_gateway_rankings', array($this, 'ajax_get_gateway_rankings'));
+        add_action('wp_ajax_sapgs_get_webhook_events', array($this, 'ajax_get_webhook_events'));
+        add_action('wp_ajax_sapgs_get_live_checklist', array($this, 'ajax_get_live_checklist'));
     }
     
     public function check_woocommerce() {
@@ -278,15 +295,15 @@ class SA_Payment_Gateway_Switcher {
         $enabled_gateways = get_option('sapgs_enabled_gateways', array());
         $is_premium = $this->license_manager->is_premium_active();
         
-        // Free users can only enable 2 gateways max
+        // Free users can only enable 1 gateway at a time
         if ($enabled && !$is_premium) {
-            // If already at limit (2 gateways) and trying to enable another
-            if (count($enabled_gateways) >= 2 && !in_array($gateway_id, $enabled_gateways)) {
+            // If already at limit (1 gateway) and trying to enable another
+            if (count($enabled_gateways) >= 1 && !in_array($gateway_id, $enabled_gateways)) {
                 wp_send_json_error(array(
-                    'message' => 'Free plan allows only 2 payment gateways. Upgrade to Premium to enable all gateways.',
+                    'message' => 'Free plan allows only 1 active gateway at a time. You can switch between gateways, but only one can be enabled simultaneously. Upgrade to Premium to enable multiple gateways with automatic failover.',
                     'limit_reached' => true,
                     'current_count' => count($enabled_gateways),
-                    'max_free' => 2
+                    'max_free' => 1
                 ));
             }
         }
@@ -304,7 +321,7 @@ class SA_Payment_Gateway_Switcher {
             'enabled_gateways' => $enabled_gateways,
             'is_premium' => $is_premium,
             'enabled_count' => count($enabled_gateways),
-            'max_free' => 2
+            'max_free' => 1
         ));
     }
     
@@ -879,6 +896,264 @@ class SA_Payment_Gateway_Switcher {
         
         wp_send_json_success(array('message' => 'Settings saved successfully'));
     }
+    
+    public function ajax_get_failover_report() {
+        check_ajax_referer('sapgs_nonce', 'nonce');
+        
+        if (!current_user_can('manage_options')) {
+            wp_send_json_error(array('message' => 'Unauthorized'));
+        }
+        
+        $license_manager = new SAPGS_LicenseManager();
+        if (!$license_manager->is_premium_active()) {
+            wp_send_json_error(array('message' => 'Failover reporting is a premium feature'));
+        }
+        
+        $days = isset($_POST['days']) ? intval($_POST['days']) : 30;
+        $gateway_id = isset($_POST['gateway_id']) ? sanitize_text_field($_POST['gateway_id']) : null;
+        
+        $failover_tracker = new SAPGS_FailoverTracker();
+        
+        if ($gateway_id) {
+            $data = $failover_tracker->get_gateway_failovers($gateway_id, $days);
+        } else {
+            $data = $failover_tracker->get_statistics($days);
+        }
+        
+        wp_send_json_success($data);
+    }
+    
+    public function ajax_check_webhook_health() {
+        check_ajax_referer('sapgs_nonce', 'nonce');
+        
+        if (!current_user_can('manage_options')) {
+            wp_send_json_error(array('message' => 'Unauthorized'));
+        }
+        
+        $gateway_id = isset($_POST['gateway_id']) ? sanitize_text_field($_POST['gateway_id']) : null;
+        
+        if (!$gateway_id) {
+            wp_send_json_error(array('message' => 'Gateway ID required'));
+        }
+        
+        $webhook_checker = new SAPGS_WebhookHealthChecker();
+        $result = $webhook_checker->check_webhook_health($gateway_id);
+        
+        wp_send_json_success($result);
+    }
+    
+    public function ajax_simulate_checkout() {
+        check_ajax_referer('sapgs_nonce', 'nonce');
+        
+        if (!current_user_can('manage_options')) {
+            wp_send_json_error(array('message' => 'Unauthorized'));
+        }
+        
+        $license_manager = new SAPGS_LicenseManager();
+        if (!$license_manager->is_premium_active()) {
+            wp_send_json_error(array('message' => 'Payment simulation is a premium feature'));
+        }
+        
+        $gateway_id = isset($_POST['gateway_id']) ? sanitize_text_field($_POST['gateway_id']) : null;
+        $amount = isset($_POST['amount']) ? floatval($_POST['amount']) : 100.00;
+        
+        if (!$gateway_id) {
+            wp_send_json_error(array('message' => 'Gateway ID required'));
+        }
+        
+        $simulator = new SAPGS_PaymentSimulator();
+        $result = $simulator->simulate_checkout($gateway_id, $amount);
+        
+        wp_send_json_success($result);
+    }
+    
+    public function ajax_get_gateway_rankings() {
+        check_ajax_referer('sapgs_nonce', 'nonce');
+        
+        if (!current_user_can('manage_options')) {
+            wp_send_json_error(array('message' => 'Unauthorized'));
+        }
+        
+        $use_live_data = isset($_POST['use_live_data']) && $_POST['use_live_data'] === 'true';
+        
+        $license_manager = new SAPGS_LicenseManager();
+        if ($use_live_data && !$license_manager->is_premium_active()) {
+            wp_send_json_error(array('message' => 'Live data rankings require premium'));
+        }
+        
+        $ranking = new SAPGS_GatewayRanking();
+        $rankings = $ranking->get_rankings($use_live_data);
+        
+        wp_send_json_success(array(
+            'rankings' => $rankings,
+            'use_live_data' => $use_live_data
+        ));
+    }
+    
+    public function ajax_get_webhook_events() {
+        check_ajax_referer('sapgs_nonce', 'nonce');
+        
+        if (!current_user_can('manage_options')) {
+            wp_send_json_error(array('message' => 'Unauthorized'));
+        }
+        
+        $gateway_id = isset($_POST['gateway_id']) ? sanitize_text_field($_POST['gateway_id']) : null;
+        $limit = isset($_POST['limit']) ? intval($_POST['limit']) : 50;
+        
+        $listener = new SAPGS_WebhookListener();
+        $events = $listener->get_recent_events($gateway_id, $limit);
+        
+        wp_send_json_success($events);
+    }
+    
+    public function ajax_get_live_checklist() {
+        check_ajax_referer('sapgs_nonce', 'nonce');
+        
+        if (!current_user_can('manage_options')) {
+            wp_send_json_error(array('message' => 'Unauthorized'));
+        }
+        
+        $checklist = array();
+        
+        // SSL Check
+        $checklist['ssl'] = array(
+            'label' => 'SSL Certificate Active',
+            'status' => is_ssl(),
+            'message' => is_ssl() ? 'Your site is using HTTPS' : 'SSL is required for payment processing'
+        );
+        
+        // WooCommerce Check
+        $checklist['woocommerce'] = array(
+            'label' => 'WooCommerce Active',
+            'status' => class_exists('WooCommerce'),
+            'message' => class_exists('WooCommerce') ? 'WooCommerce is installed and active' : 'WooCommerce is required'
+        );
+        
+        // Currency Check
+        $currency_zar = false;
+        $current_currency = 'N/A';
+        if (function_exists('get_woocommerce_currency')) {
+            $current_currency = get_woocommerce_currency();
+            $currency_zar = $current_currency === 'ZAR';
+        }
+        $checklist['currency'] = array(
+            'label' => 'Currency: ZAR',
+            'status' => $currency_zar,
+            'message' => $currency_zar ? 'Store currency is set to ZAR' : sprintf('Current currency: %s (ZAR recommended)', $current_currency)
+        );
+        
+        // Gateway Configuration Check
+        $gateway_manager = new SAPGS_GatewayManager();
+        $enabled_gateways = $gateway_manager->get_enabled_gateways();
+        $has_configured = !empty($enabled_gateways);
+        $checklist['gateway_configured'] = array(
+            'label' => 'At Least One Gateway Configured',
+            'status' => $has_configured,
+            'message' => $has_configured ? 'Gateway is configured' : 'Configure at least one payment gateway'
+        );
+        
+        // Test Payments Check
+        $logger = new SAPGS_Logger();
+        $test_logs = $logger->get_logs(null, 5);
+        $has_test_payments = !empty($test_logs);
+        $checklist['test_payments'] = array(
+            'label' => 'Test Payments Completed',
+            'status' => $has_test_payments,
+            'message' => $has_test_payments ? 'Test payments have been processed' : 'Run test payments before going live'
+        );
+        
+        // Webhooks Check
+        $webhook_checker = new SAPGS_WebhookHealthChecker();
+        $webhook_health = array();
+        foreach ($enabled_gateways as $id => $gateway) {
+            $health = $webhook_checker->get_health_stats($id, 1);
+            if (!empty($health)) {
+                $webhook_health[$id] = $health[0];
+            }
+        }
+        $checklist['webhooks'] = array(
+            'label' => 'Webhooks Configured',
+            'status' => !empty($webhook_health),
+            'message' => !empty($webhook_health) ? 'Webhook endpoints are reachable' : 'Configure webhooks in your gateway dashboard'
+        );
+        
+        // Calculate overall status
+        $all_passed = true;
+        foreach ($checklist as $item) {
+            if (!$item['status']) {
+                $all_passed = false;
+                break;
+            }
+        }
+        
+        wp_send_json_success(array(
+            'checklist' => $checklist,
+            'all_passed' => $all_passed,
+            'passed_count' => count(array_filter($checklist, function($item) { return $item['status']; })),
+            'total_count' => count($checklist)
+        ));
+    }
+    
+    /**
+     * Handle incoming webhook requests
+     */
+    public function handle_webhook_request() {
+        // Check if this is a webhook request
+        if (!isset($_GET['sapgs_webhook'])) {
+            return;
+        }
+        
+        $gateway_id = sanitize_text_field($_GET['sapgs_webhook']);
+        
+        // Get webhook payload
+        $payload = file_get_contents('php://input');
+        $headers = array();
+        if (function_exists('getallheaders')) {
+            $headers = getallheaders();
+        } else {
+            // Fallback for servers without getallheaders
+            foreach ($_SERVER as $key => $value) {
+                if (strpos($key, 'HTTP_') === 0) {
+                    $header_key = str_replace(' ', '-', ucwords(str_replace('_', ' ', strtolower(substr($key, 5)))));
+                    $headers[$header_key] = $value;
+                }
+            }
+        }
+        
+        // Log the webhook event
+        $webhook_listener = new SAPGS_WebhookListener();
+        
+        // Try to determine event type from payload or headers
+        $event_type = 'payment_notification';
+        if (isset($headers['X-Event-Type'])) {
+            $event_type = $headers['X-Event-Type'];
+        } elseif (isset($headers['x-event-type'])) {
+            $event_type = $headers['x-event-type'];
+        }
+        
+        // Try to validate signature (gateway-specific)
+        $signature_valid = null;
+        if (isset($headers['X-Signature']) || isset($headers['x-signature'])) {
+            // Signature validation would be gateway-specific
+            // For now, we'll mark it as unknown
+            $signature_valid = null;
+        }
+        
+        // Parse payload
+        $payload_data = json_decode($payload, true);
+        if (!$payload_data && !empty($payload)) {
+            parse_str($payload, $payload_data);
+        }
+        
+        // Record the webhook event
+        $webhook_listener->record_event($gateway_id, $event_type, $payload_data ? $payload_data : $payload, $signature_valid);
+        
+        // Return success response
+        status_header(200);
+        header('Content-Type: application/json');
+        echo json_encode(array('status' => 'received'));
+        exit;
+    }
 }
 
 /**
@@ -955,11 +1230,63 @@ register_activation_hook(__FILE__, function() {
         KEY percentage_fee (percentage_fee)
     ) $charset_collate;";
     
+    // Failover tracking table
+    $table_failovers = $wpdb->prefix . 'sapgs_failovers';
+    $sql_failovers = "CREATE TABLE $table_failovers (
+        id bigint(20) NOT NULL AUTO_INCREMENT,
+        primary_gateway_id varchar(50) NOT NULL,
+        backup_gateway_id varchar(50) NOT NULL,
+        order_id bigint(20),
+        amount decimal(10,2),
+        error_message text,
+        recovery_time int(11),
+        created_at datetime DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY (id),
+        KEY primary_gateway_id (primary_gateway_id),
+        KEY backup_gateway_id (backup_gateway_id),
+        KEY created_at (created_at),
+        KEY order_id (order_id)
+    ) $charset_collate;";
+    
+    // Webhook health checks table
+    $table_webhooks = $wpdb->prefix . 'sapgs_webhook_health';
+    $sql_webhooks = "CREATE TABLE $table_webhooks (
+        id bigint(20) NOT NULL AUTO_INCREMENT,
+        gateway_id varchar(50) NOT NULL,
+        is_reachable tinyint(1) DEFAULT 0,
+        signature_valid tinyint(1) DEFAULT 0,
+        response_time int(11),
+        error_message text,
+        checked_at datetime DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY (id),
+        KEY gateway_id (gateway_id),
+        KEY checked_at (checked_at),
+        KEY is_reachable (is_reachable)
+    ) $charset_collate;";
+    
+    // Test webhook listener table (for test mode)
+    $table_webhook_listener = $wpdb->prefix . 'sapgs_webhook_events';
+    $sql_webhook_listener = "CREATE TABLE $table_webhook_listener (
+        id bigint(20) NOT NULL AUTO_INCREMENT,
+        gateway_id varchar(50) NOT NULL,
+        event_type varchar(50),
+        payload text,
+        signature_valid tinyint(1) DEFAULT 0,
+        received_at datetime DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY (id),
+        KEY gateway_id (gateway_id),
+        KEY received_at (received_at),
+        KEY event_type (event_type)
+    ) $charset_collate;";
+    
     require_once(ABSPATH . 'wp-admin/includes/upgrade.php');
     dbDelta($sql_logs);
     dbDelta($sql_tests);
     dbDelta($sql_uptime);
     dbDelta($sql_fees);
+    dbDelta($sql_failovers);
+    dbDelta($sql_webhooks);
+    dbDelta($sql_webhook_listener);
     
     // Set default options
     add_option('sapgs_version', SAPGS_VERSION);
